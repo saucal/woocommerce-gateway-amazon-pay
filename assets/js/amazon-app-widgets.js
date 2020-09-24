@@ -173,6 +173,18 @@ jQuery( function( $ ) {
 		return formattedAddress;
 	}
 
+	function hasShippingAddressChanged( shippingAddress ) {
+		if ( shippingAddress ) {
+			if ( shippingAddress.address_1 === $( '#shipping_address_1' ).val() &&
+			shippingAddress.city === $( '#shipping_city' ).val() &&
+			shippingAddress.postcode === $( '#shipping_postcode' ).val() &&
+			shippingAddress.country === $( '#shipping_country' ).val() ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	function setOrderAddress( prefix, address ) {
 		var fieldList = Object.keys( address );
 		for ( var key in fieldList ) {
@@ -181,7 +193,7 @@ jQuery( function( $ ) {
 		}
 	}
 
-	function clearOrderFormData() {
+	function clearOrderFormData( includeShipping ) {
 		var fieldsToBeCleared = [
 			'billing_first_name',
 			'billing_last_name',
@@ -194,30 +206,34 @@ jQuery( function( $ ) {
 			'billing_state',
 			'billing_country',
 			'billing_email',
-			'shipping_first_name',
-			'shipping_last_name',
-			'shipping_company',
-			'shipping_address_1',
-			'shipping_address_2',
-			'shipping_phone',
-			'shipping_city',
-			'shipping_postcode',
-			'shipping_state',
-			'shipping_country',
 		];
+		if ( includeShipping ) {
+			fieldsToBeCleared.push(
+				'shipping_first_name',
+				'shipping_last_name',
+				'shipping_company',
+				'shipping_address_1',
+				'shipping_address_2',
+				'shipping_phone',
+				'shipping_city',
+				'shipping_postcode',
+				'shipping_state',
+				'shipping_country'
+			);
+		}
 		for ( var field in fieldsToBeCleared ) {
 			editFormInputField( fieldsToBeCleared[ field ], '' );
 		}
 	}
 
 	function setOrderFormData( orderReference ) {
-		clearOrderFormData();
 		var hasShippingAddress = orderReference.Destination && orderReference.Destination.PhysicalDestination;
 		var hasBillingAddress = orderReference.BillingAddress && orderReference.BillingAddress.PhysicalAddress;
 
 		var shippingAddress = ( hasShippingAddress ) ? formatAmazonAddress( orderReference.Destination.PhysicalDestination ) : {};
+		var shippingAddressChanged = hasShippingAddressChanged( shippingAddress );
 		var billingAddress = null;
-
+		clearOrderFormData( shippingAddressChanged );
 		if ( hasBillingAddress ) {
 			billingAddress = formatAmazonAddress( orderReference.BillingAddress.PhysicalAddress );
 		} else {
@@ -232,7 +248,7 @@ jQuery( function( $ ) {
 		billingAddress.phone = billingAddress.phone || orderReference.Buyer.Phone;
 
 		setOrderAddress( 'billing_', billingAddress );
-		if ( hasShippingAddress ) {
+		if ( hasShippingAddress && shippingAddressChanged ) {
 			setOrderAddress( 'shipping_', shippingAddress );
 		}
 	}
