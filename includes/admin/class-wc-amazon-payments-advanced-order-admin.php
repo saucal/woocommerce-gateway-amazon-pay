@@ -110,7 +110,7 @@ class WC_Amazon_Payments_Advanced_Order_Admin {
 
 		$order_id = absint( $post->ID );
 		$order    = wc_get_order( $order_id );
-		if ( ! $order ) {
+		if ( ! $order || is_a( $order, 'WC_Subscription' ) ) {
 			return;
 		}
 
