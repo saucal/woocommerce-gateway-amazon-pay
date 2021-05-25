@@ -276,6 +276,11 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 			$button_btn  = '<a class="register_now button-primary">' . __( 'Reconnect to Amazon Pay', 'woocommerce-gateway-amazon-payments-advanced' ) . '</a>';
 		}
 
+		if ( $this->has_v1_settings() && ! $this->is_v1_configured() ) {
+			$button_desc = __( 'In restore functionality for your legacy orders/subscriptions, you need to reconnect to your account.', 'woocommerce-gateway-amazon-payments-advanced' );
+			$button_btn  = '<a class="register_now button-primary" data-onboarding-version="1">' . __( 'Reconnect to Amazon Pay', 'woocommerce-gateway-amazon-payments-advanced' ) . '</a>';
+		}
+
 		$this->form_fields = array(
 			'important_note'                => array(
 				'title'       => __( 'Important note, before you sign up:', 'woocommerce-gateway-amazon-payments-advanced' ),

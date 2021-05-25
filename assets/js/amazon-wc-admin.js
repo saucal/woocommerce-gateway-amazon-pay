@@ -64,7 +64,6 @@
 			// Init values if region is already selected
 			wc_simple_path_form.payment_region_on_change();
 
-			wc_simple_path_form.create_form();
 			wc_simple_path_form.payment_region_input.on( 'change', this.payment_region_on_change );
 			wc_simple_path_form.register_now_link.on( 'click', this.register_link_on_click );
 			wc_simple_path_form.delete_settings_link.on( 'click', this.delete_settings_on_click );
@@ -124,8 +123,7 @@
 				wc_simple_path_form.action_url = wc_simple_path_form.get_simple_path_url();
 				wc_simple_path_form.spId = wc_simple_path_form.get_spId();
 
-				$( '#' + wc_simple_path_form.simple_path_form_id ).attr( 'action', wc_simple_path_form.action_url );
-				$( 'input[name=spId]' ).val( wc_simple_path_form.spId );
+				wc_simple_path_form.create_form();
 			}
 		},
 		set_credentials_values: function( merchant_id, store_id, public_key_id ) {
@@ -142,9 +140,11 @@
 				e.stopPropagation();
 				return;
 			}
+			var onboardingVersion = $(this).data( 'onboarding-version' );
 			// Trigger simple path form on all regions except JP.
 			if ( 'jp' !== wc_simple_path_form.get_region_selected() ) {
 				e.preventDefault();
+				wc_simple_path_form.create_form( onboardingVersion );
 				document.getElementById( wc_simple_path_form.simple_path_form_id ).submit.click();
 				wc_simple_path_form.main_setting_form.block( {
 					message: 'Waiting for Credentials From Amazon Seller Central',
@@ -180,7 +180,11 @@
 				);
 			}
 		},
-		create_form: function() {
+		create_form: function( onboardingVersion ) {
+			if ( typeof onboardingVersion == 'undefined' ) {
+				onboardingVersion = wc_simple_path_form.onboarding_version
+			}
+			$( '#' + wc_simple_path_form.simple_path_form_id ).remove();
 			$( '.wrap.woocommerce' ).append(
 				$(
 					'<form/>',
@@ -204,7 +208,7 @@
 						{
 							type: 'hidden',
 							name: 'onboardingVersion',
-							value: wc_simple_path_form.onboarding_version
+							value: onboardingVersion
 						}
 					),
 					$(
