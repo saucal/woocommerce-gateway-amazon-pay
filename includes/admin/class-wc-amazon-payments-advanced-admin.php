@@ -139,10 +139,10 @@ class WC_Amazon_Payments_Advanced_Admin {
 			if ( ! $in_settings ) {
 				$notices[] = array(
 					'dismiss_action' => 'amazon_pay_dismiss_cv1_broken',
-					'class'          => 'notice notice-warning',
+					'class'          => 'notice notice-error',
 					'text'           => sprintf(
 						/* translators: 1) The URL to the Amazon Pay settings screen. */
-						'<p>' . __( 'Your Amazon Pay legacy settings seem corrupted. If you see issues processing legacy orders/subscriptions. Please follow the instructions in the <a href="%1$s">Amazon Pay Settings</a> to go through a recovery process.', 'woocommerce-gateway-amazon-payments-advanced' ) . '</p>',
+						'<p>' . __( 'The Amazon Pay gateway 2.0.0 release introduce an issue that requires you to reconnect to Amazon Pay to operate with orders and/or subscriptions generated up to 1.13.1. Please click the "Reconnect to Amazon Pay" button in the <a href="%1$s">Amazon Pay Settings</a> to go through this recovery process. Sorry for any inconvinience.', 'woocommerce-gateway-amazon-payments-advanced' ) . '</p>',
 						esc_url( $this->get_settings_url() )
 					),
 					'is_dismissable' => false,
@@ -150,8 +150,8 @@ class WC_Amazon_Payments_Advanced_Admin {
 			} else {
 				$notices[] = array(
 					'dismiss_action' => 'amazon_pay_dismiss_cv1_broken',
-					'class'          => 'notice notice-warning',
-					'text'           => '<p>' . __( 'Your Amazon Pay legacy settings seem corrupted. If you see issues processing legacy orders/subscriptions. Please follow the instructions in the <a href="#" class="wcapa-toggle-section wcapa-toggle-scroll"  data-toggle="#v1-settings-container">Previous Version Configuration</a> area go through a recovery process.', 'woocommerce-gateway-amazon-payments-advanced' ) . '</p>',
+					'class'          => 'notice notice-error',
+					'text'           => '<p>' . __( 'The Amazon Pay gateway 2.0.0 release introduce an issue that requires you to reconnect to Amazon Pay to operate with orders and/or subscriptions generated up to 1.13.1. Please click the "Reconnect to Amazon Pay" button below to go through this recovery process. Sorry for any inconvinience.', 'woocommerce-gateway-amazon-payments-advanced' ) . '</p>',
 					'is_dismissable' => false,
 				);
 			}
