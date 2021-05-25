@@ -407,6 +407,10 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 	}
 
 	/**
+	 * LEGACY v1 METHODS AND HOOKS
+	 */
+
+	/**
 	 * Handle simple path exchange request (v1)
 	 *
 	 * @return void
