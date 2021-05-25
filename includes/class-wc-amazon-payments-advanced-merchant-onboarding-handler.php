@@ -259,7 +259,7 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 	protected function save_payload( $payload ) {
 		$settings = WC_Amazon_Payments_Advanced_API::get_settings();
 
-		if ( isset( $payload->access_key ) ) {
+		if ( isset( $payload->access_key, $payload->merchant_id, $payload->secret_key, $payload->client_id, $payload->client_secret ) ) {
 			$settings['seller_id']         = $payload->merchant_id;
 			$settings['mws_access_key']    = $payload->access_key;
 			$settings['secret_key']        = $payload->secret_key;
@@ -444,7 +444,7 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 			}
 
 			// URL decode values.
-			foreach ( $payload as $key => $value ) {
+			foreach ( (array) $payload as $key => $value ) {
 				$payload->$key = rawurldecode( $value );
 			}
 
@@ -455,6 +455,9 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 				}
 				$final_payload = $this->mcrypt_decrypt_alternative( $payload, $decrypted_key );
 				$final_payload = json_decode( $final_payload );
+				if ( ! isset( $final_payload->access_key, $final_payload->merchant_id, $final_payload->secret_key, $final_payload->client_id, $final_payload->client_secret ) ) {
+					throw new Exception( esc_html__( 'Unable to import Amazon keys. Some of the exchanged data is corrupted.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+				}
 				$this->save_payload( $final_payload );
 
 				header( 'Access-Control-Allow-Origin: ' . $this->get_origin_header( $headers ) );
@@ -520,7 +523,7 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 	 *
 	 * @param object $payload JSON payload.
 	 *
-	 * @return string
+	 * @return string|bool
 	 * @throws Exception On errors.
 	 */
 	protected function decrypt_encrypted_key_from_payload( $payload ) {
