@@ -36,13 +36,46 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 	}
 
 	/**
-	 * Check Onboarding Request.
+	 * Route requests for automatic configuration.
 	 *
-	 * @throws Exception On errors.
+	 * @return void
 	 */
 	public function check_onboarding_request() {
 		wc_apa()->log( 'Received Onboarding Key Exchage request.' );
 
+		$headers              = $this->get_all_headers();
+		$registration_country = $this->get_country_origin_from_header( $headers );
+		$raw_post_data        = $this->get_raw_post_data();
+		parse_str( $raw_post_data, $body );
+
+		try {
+			$payload = array();
+			if ( isset( $body['payload'] ) ) {
+				$payload = json_decode( $body['payload'], true );
+			}
+			if ( isset( $payload['encryptedPayload'] ) ) {
+				$this->check_simple_path_request();
+			} else {
+				$this->check_onboarding_request_v2();
+			}
+		} catch ( Exception $e ) {
+			wc_apa()->log( 'Failed to handle automatic key exchange request: ' . $e->getMessage() );
+			wp_send_json(
+				array(
+					'result'  => 'error',
+					'message' => esc_html__( 'Bad request.', 'woocommerce-gateway-amazon-payments-advanced' ) . ' ' . $e->getMessage(),
+				),
+				400
+			);
+		}
+	}
+
+	/**
+	 * Check Onboarding Request.
+	 *
+	 * @throws Exception On errors.
+	 */
+	public function check_onboarding_request_v2() {
 		$headers              = $this->get_all_headers();
 		$registration_country = $this->get_country_origin_from_header( $headers );
 		$raw_post_data        = $this->get_raw_post_data();
@@ -226,12 +259,22 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 	protected function save_payload( $payload ) {
 		$settings = WC_Amazon_Payments_Advanced_API::get_settings();
 
-		$settings['merchant_id']                     = $payload->merchantId; // phpcs:ignore WordPress.NamingConventions
-		$settings['store_id']                        = $payload->storeId; // phpcs:ignore WordPress.NamingConventions
-		$settings['public_key_id']                   = $payload->publicKeyId; // phpcs:ignore WordPress.NamingConventions
+		if ( isset( $payload->access_key ) ) {
+			$settings['seller_id']         = $payload->merchant_id;
+			$settings['mws_access_key']    = $payload->access_key;
+			$settings['secret_key']        = $payload->secret_key;
+			$settings['app_client_id']     = $payload->client_id;
+			$settings['app_client_secret'] = $payload->client_secret;
+			update_option( 'woocommerce_amazon_payments_advanced_saved_payload', '1' );
+		} else {
+			$settings['merchant_id']   = $payload->merchantId; // phpcs:ignore WordPress.NamingConventions
+			$settings['store_id']      = $payload->storeId; // phpcs:ignore WordPress.NamingConventions
+			$settings['public_key_id'] = $payload->publicKeyId; // phpcs:ignore WordPress.NamingConventions
+			update_option( 'woocommerce_amazon_payments_advanced_saved_payload', '2' );
+		}
+
 		$settings['amazon_keys_setup_and_validated'] = 1;
 		update_option( 'woocommerce_amazon_payments_advanced_settings', $settings );
-		update_option( 'woocommerce_amazon_payments_advanced_saved_payload', true );
 	}
 
 	/**
@@ -298,8 +341,10 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 	protected function get_country_origin_from_header( $headers ) {
 		switch ( $this->get_origin_header( $headers ) ) {
 			case 'https://payments.amazon.com':
+			case 'https://sellercentral.amazon.com':
 				return 'us';
 			case 'https://payments-eu.amazon.com':
+			case 'https://sellercentral-europe.amazon.com':
 				return 'eu';
 			default:
 				return 'us';
@@ -359,6 +404,220 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 	 */
 	public static function delete_migration_status() {
 		delete_option( 'amazon_api_version' );
+	}
+
+	/**
+	 * Handle simple path exchange request (v1)
+	 *
+	 * @return void
+	 * @throws Exception On errors.
+	 */
+	public function check_simple_path_request() {
+		wc_apa()->log( 'Received Simple Path Registration Key Exchage request (legacy).' );
+
+		$headers              = $this->get_all_headers();
+		$registration_country = $this->get_country_origin_from_header( $headers );
+		$raw_post_data        = $this->get_raw_post_data();
+		parse_str( $raw_post_data, $body );
+
+		try {
+			$payload = array();
+			if ( isset( $body['payload'] ) ) {
+				$payload = json_decode( $body['payload'], true );
+			}
+			$payload        = (object) filter_var_array(
+				$payload,
+				array(
+					'encryptedKey'     => FILTER_SANITIZE_STRING,
+					'encryptedPayload' => FILTER_SANITIZE_STRING,
+					'iv'               => FILTER_SANITIZE_STRING,
+					'sigKeyID'         => FILTER_SANITIZE_STRING,
+					'signature'        => FILTER_SANITIZE_STRING,
+				),
+				true
+			);
+			$payload_verify = ( $payload ) ? clone $payload : false;
+
+			// Validate JSON payload.
+			if ( ! isset( $payload->encryptedKey, $payload->encryptedPayload, $payload->iv, $payload->sigKeyID, $payload->signature ) ) { // phpcs:ignore WordPress.NamingConventions
+				throw new Exception( esc_html__( 'Unable to import Amazon keys. Please verify your JSON format and values.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+			}
+
+			// URL decode values.
+			foreach ( $payload as $key => $value ) {
+				$payload->$key = rawurldecode( $value );
+			}
+
+			if ( $this->validate_public_key_from_payload( $payload, $payload_verify, $registration_country ) ) {
+				$decrypted_key = $this->decrypt_encrypted_key_from_payload( $payload );
+				if ( empty( $decrypted_key ) ) {
+					throw new Exception( 'Couldn\'t decrypt key.' );
+				}
+				$final_payload = $this->mcrypt_decrypt_alternative( $payload, $decrypted_key );
+				$final_payload = json_decode( $final_payload );
+				$this->save_payload( $final_payload );
+
+				header( 'Access-Control-Allow-Origin: ' . $this->get_origin_header( $headers ) );
+				header( 'Access-Control-Allow-Methods: GET, POST' );
+				header( 'Access-Control-Allow-Headers: Content-Type' );
+				wp_send_json( array( 'result' => 'success' ), 200 );
+			}
+		} catch ( Exception $e ) {
+			wc_apa()->log( 'Failed to handle automatic key exchange request: ' . $e->getMessage() );
+			wp_send_json(
+				array(
+					'result'  => 'error',
+					'message' => esc_html__( 'Bad request.', 'woocommerce-gateway-amazon-payments-advanced' ) . ' ' . $e->getMessage(),
+				),
+				400
+			);
+		}
+	}
+
+	/**
+	 * 1. First validate that the request came from Amazon Pay.
+	 *   a. Retrieve sigKeyId from the encrypted credential payload.
+	 *   b. Make a HEAD or GET request to getpublickey
+	 *   c. You will receive a public key in the response, which is used to validate the signature.
+	 *   d. Base64decode the signature from the encrypted credential payload.
+	 *   e. Use the verify function of the openSSL package (specifying the SHA256 algorithm), and pass
+	 *      in the result of 1d (base 64 decoded signature) and 1c (public key).
+	 *   f. Confirm that the verify command is successful.
+	 *
+	 * @param object $payload Original exchange payload.
+	 * @param object $payload_verify Clone of original payload (withouth urldecode).
+	 * @param string $registration_country Registration country.
+	 *
+	 * @return bool
+	 * @throws Exception On errors.
+	 */
+	protected function validate_public_key_from_payload( $payload, $payload_verify, $registration_country ) {
+		$amazon_public_key = $this->get_amazon_public_key( $registration_country, $payload->sigKeyID ); // phpcs:ignore WordPress.NamingConventions
+
+		// Use raw JSON (without signature or URL decode) as the data to verify signature.
+		unset( $payload_verify->signature );
+		$payload_verify_json = wp_json_encode( $payload_verify );
+
+		if ( $amazon_public_key &&
+			openssl_verify(
+				$payload_verify_json,
+				base64_decode( $payload->signature ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+				$this->key2pem( $amazon_public_key ),
+				'SHA256'
+			)
+		) {
+			return true;
+		}
+		throw new Exception( esc_html__( 'Request not coming from Amazon', 'woocommerce-gateway-amazon-payments-advanced' ) );
+	}
+
+	/**
+	 * Decrypt the encryptedKey value from the encrypted credential payload.
+	 * This gives you the key that was used to encrypt the encryptedPayload value.
+	 *   a. Base64decode the encryptedKey value from the encrypted credential payload.
+	 *   b. Use the private decrypt function of the openSSL package (specifying the OPENSSL_PKCS1_OAEP_PADDING algorithm),
+	 *      to decrypt the result of 2a, passing in the private key that was generated on opening the workflow.
+	 *
+	 * @param object $payload JSON payload.
+	 *
+	 * @return string
+	 * @throws Exception On errors.
+	 */
+	protected function decrypt_encrypted_key_from_payload( $payload ) {
+		$decrypted_key = null;
+
+		$private_keys = $this->get_temp_private_keys();
+		$private_keys = array_reverse( $private_keys ); // it's more likely that the last one is the one that works.
+		array_unshift( $private_keys, $this->get_private_key() ); // also include main private key if it exists.
+
+		$found = false;
+
+		foreach ( $private_keys as $private_key ) {
+			$res = openssl_private_decrypt(
+				base64_decode( $payload->encryptedKey ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode, WordPress.NamingConventions
+				$decrypted_key,
+				$private_key,
+				OPENSSL_PKCS1_OAEP_PADDING
+			);
+
+			if ( $res ) {
+				$found = $decrypted_key;
+				break;
+			}
+		}
+
+		if ( ! $found ) {
+			return false;
+		}
+
+		return $decrypted_key;
+	}
+
+	/**
+	 * Decrypt payload with mcrypt alternative.
+	 *
+	 * @param object $payload Payload Data.
+	 * @param string $decrypted_key Decrypted Key exchanged.
+	 *
+	 * @return string
+	 */
+	protected function mcrypt_decrypt_alternative( $payload, $decrypted_key ) {
+		if ( function_exists( 'mcrypt_decrypt' ) ) {
+			// phpcs:disable PHPCompatibility.FunctionUse.RemovedFunctions, PHPCompatibility.Extensions.RemovedExtensions, PHPCompatibility.Constants.RemovedConstants, WordPress.PHP.NoSilencedErrors
+			$final_payload = @mcrypt_decrypt(
+				MCRYPT_RIJNDAEL_128,
+				$decrypted_key,
+				base64_decode( $payload->encryptedPayload ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode, WordPress.NamingConventions
+				MCRYPT_MODE_CBC,
+				base64_decode( $payload->iv ) // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+			);
+			// phpcs:enable PHPCompatibility.FunctionUse.RemovedFunctions, PHPCompatibility.Extensions.RemovedExtensions, PHPCompatibility.Constants.RemovedConstants, WordPress.PHP.NoSilencedErrors
+		} else {
+			$final_payload = openssl_decrypt( base64_decode( $payload->encryptedPayload ), 'AES-256-CBC', $decrypted_key, true, base64_decode( $payload->iv ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode, WordPress.NamingConventions
+		}
+
+		// Remove binary characters.
+		$final_payload = preg_replace( '/[\x00-\x1F\x80-\xFF]/', '', $final_payload );
+		return $final_payload;
+	}
+
+	/**
+	 * API call to validate that the request ($sigkey_id) came from Amazon Pay.
+	 *
+	 * @param string $region Region ID.
+	 * @param string $sigkey_id Signing Key ID.
+	 *
+	 * @return string
+	 * @throws Exception On errors.
+	 */
+	public function get_amazon_public_key( $region, $sigkey_id ) {
+		if ( ! isset( WC_Amazon_Payments_Advanced_API::$get_public_keys_urls[ $region ] ) ) {
+			throw new Exception( esc_html__( 'Invalid region.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+		}
+
+		$url = add_query_arg(
+			array(
+				'sigkey_id' => $sigkey_id,
+			),
+			WC_Amazon_Payments_Advanced_API::$get_public_keys_urls[ $region ]
+		);
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'maxredirects' => 2,
+				'timeout'      => 30,
+			)
+		);
+
+		if ( ! is_wp_error( $response ) ) {
+			$body = urldecode( $response['body'] );
+			wc_apa()->log( sprintf( 'Response: %s', $body ) );
+			return $body;
+		} else {
+			wc_apa()->log( sprintf( 'Error: %s', $response->get_error_message() ) );
+			throw new Exception( $response->get_error_message() );
+		}
 	}
 
 }

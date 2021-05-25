@@ -377,18 +377,25 @@ class WC_Amazon_Payments_Advanced_Admin {
 		$result        = -1;
 		$settings      = WC_Amazon_Payments_Advanced_API::get_settings();
 		$saved_payload = get_option( 'woocommerce_amazon_payments_advanced_saved_payload' );
+		if ( empty( $saved_payload ) ) {
+			wp_send_json_success( $result );
+			return;
+		}
+		delete_option( 'woocommerce_amazon_payments_advanced_saved_payload' );
 		if ( ! empty( $settings['merchant_id'] )
 			&& ! empty( $settings['store_id'] )
 			&& ! empty( $settings['public_key_id'] )
-			&& $saved_payload
+			&& '2' === $saved_payload
 		) {
 			$result = array(
 				'merchant_id'   => $settings['merchant_id'],
 				'store_id'      => $settings['store_id'],
 				'public_key_id' => $settings['public_key_id'],
-
 			);
-			delete_option( 'woocommerce_amazon_payments_advanced_saved_payload' );
+		} else {
+			$result = array(
+				'reload' => true,
+			);
 		}
 		wp_send_json_success( $result );
 	}

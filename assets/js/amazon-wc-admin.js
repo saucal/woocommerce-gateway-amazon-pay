@@ -332,6 +332,10 @@
 					type: 'GET',
 					success: function( result ) {
 						if ( -1 !== result.data ) {
+							if ( true === result.data.reload ) {
+								location.reload();
+								return;
+							}
 							wc_simple_path_form.set_credentials_values(
 								result.data.merchant_id,
 								result.data.store_id,
