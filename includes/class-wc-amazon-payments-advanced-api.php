@@ -140,46 +140,6 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 	}
 
 	/**
-	 * Location type detection.
-	 *
-	 * @param  object $location Location to check.
-	 * @return boolean
-	 */
-	private static function location_is_continent( $location ) {
-		return 'continent' === $location->type;
-	}
-
-	/**
-	 * Location type detection.
-	 *
-	 * @param  object $location Location to check.
-	 * @return boolean
-	 */
-	private static function location_is_country( $location ) {
-		return 'country' === $location->type;
-	}
-
-	/**
-	 * Location type detection.
-	 *
-	 * @param  object $location Location to check.
-	 * @return boolean
-	 */
-	private static function location_is_state( $location ) {
-		return 'state' === $location->type;
-	}
-
-	/**
-	 * Location type detection.
-	 *
-	 * @param  object $location Location to check.
-	 * @return boolean
-	 */
-	private static function location_is_postcode( $location ) {
-		return 'postcode' === $location->type;
-	}
-
-	/**
 	 * Remove string from string letters.
 	 *
 	 * @param  string $string String to clean.
@@ -285,6 +245,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 			}
 		}
 
+		$current_loops_zones = array();
 		foreach ( $raw_zones as $raw_zone ) {
 			$zone    = new WC_Shipping_Zone( $raw_zone );
 			$methods = $zone->get_shipping_methods( true, 'json' );
@@ -292,50 +253,78 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 				continue; // If no shipping methods, we assume no support on this region.
 			}
 
-			$locations  = $zone->get_zone_locations( 'json' );
-			$continents = array_filter( $locations, array( __CLASS__, 'location_is_continent' ) );
-			$countries  = array_filter( $locations, array( __CLASS__, 'location_is_country' ) );
-			$states     = array_filter( $locations, array( __CLASS__, 'location_is_state' ) );
-			$postcodes  = array_filter( $locations, array( __CLASS__, 'location_is_postcode' ) ); // HARD TODO: Postcode wildcards can't be implemented afaik.
+			$locations = $zone->get_zone_locations( 'json' );
 
-			foreach ( $continents as $location ) {
-				foreach ( $all_continents[ $location->code ]['countries'] as $country ) {
-					if ( ! isset( $zones[ $country ] ) ) {
-						$zones[ $country ] = new stdClass(); // If we use an empty array it'll be treated as an array in JSON.
-					}
+			/**
+			 * Post code rules will be applied to every country defined by the current zone locations.
+			 * If there is no country available they will not be applied.
+			 */
+			$postcode_rules = array();
+
+			/**
+			 * @see https://developer.amazon.com/docs/amazon-pay-api-v2/checkout-session.html#type-restriction
+			 */
+			foreach ( $locations as $location ) {
+				switch ( $location->type ) {
+					case 'continent':
+						foreach ( $all_continents[ $location->code ]['countries'] as $country ) {
+							if ( ! isset( $current_loops_zones[ $country ] ) ) {
+								$current_loops_zones[ $country ] = new stdClass(); // If we use an empty array it'll be treated as an array in JSON.
+							}
+						}
+						break;
+					case 'country':
+						$current_loops_zones[ $location->code ] = new stdClass(); // If we use an empty array it'll be treated as an array in JSON.
+						break;
+					case 'state':
+						$location_codes = explode( ':', $location->code );
+						$country        = strtoupper( $location_codes[0] );
+						$state          = $location_codes[1];
+						if ( ! isset( $current_loops_zones[ $country ] ) ) {
+							$current_loops_zones[ $country ]                  = new stdClass(); // If we use an empty array it'll be treated as an array in JSON.
+							$current_loops_zones[ $country ]->statesOrRegions = array(); // phpcs:ignore WordPress.NamingConventions
+						} else {
+							if ( ! isset( $current_loops_zones[ $country ]->statesOrRegions ) ) { // phpcs:ignore WordPress.NamingConventions
+								// Do not override anything if the country is allowed fully.
+								break;
+							}
+						}
+
+						$current_loops_zones[ $country ]->statesOrRegions[] = $state; // phpcs:ignore WordPress.NamingConventions
+						if ( 'US' !== $country ) {
+
+							$current_loops_zones[ $country ]->statesOrRegions[] = $all_states[ $country ][ $state ]; // phpcs:ignore WordPress.NamingConventions
+							$variation_state                                    = self::remove_signs( $all_states[ $country ][ $state ] );
+							if ( $variation_state !== $all_states[ $country ][ $state ] ) {
+								$current_loops_zones[ $country ]->statesOrRegions[] = $variation_state; // phpcs:ignore WordPress.NamingConventions
+							}
+						}
+						break;
+					case 'postcode':
+						$postcode = $location->code;
+						if ( strstr( $postcode, '...' ) ) {
+							$postcode = array_map( 'intval', explode( '...', $postcode ) );
+							for ( $i = $postcode['0']; $i <= $postcode['1']; $i++ ) {
+								$postcode_rules[] = (string) $i;
+							}
+						} else {
+							$postcode_rules[] = $postcode;
+						}
+						break;
 				}
 			}
 
-			foreach ( $countries as $location ) {
-				$country = $location->code;
-				// We're forcing it to be an empty, since it will override if the full country is allowed anywhere.
-				$zones[ $country ] = new stdClass(); // If we use an empty array it'll be treated as an array in JSON.
-			}
-
-			foreach ( $states as $location ) {
-				$location_codes = explode( ':', $location->code );
-				$country        = strtoupper( $location_codes[0] );
-				$state          = $location_codes[1];
-				if ( ! isset( $zones[ $country ] ) ) {
-					$zones[ $country ]                  = new stdClass(); // If we use an empty array it'll be treated as an array in JSON.
-					$zones[ $country ]->statesOrRegions = array();
+			foreach ( $current_loops_zones as $country => $object ) {
+				if ( ! empty( $postcode_rules ) ) {
+					$object->zipCodes = $postcode_rules; // phpcs:ignore WordPress.NamingConventions
+				}
+				if ( ! empty( $zones[ $country ] ) ) {
+					$zones[ $country ] = self::pick_most_generic_option( $zones[ $country ], $object );
 				} else {
-					if ( ! isset( $zones[ $country ]->statesOrRegions ) ) {
-						// Do not override anything if the country is allowed fully.
-						continue;
-					}
-				}
-
-				$zones[ $country ]->statesOrRegions[] = $state;
-				if ( 'US' !== $country ) {
-
-					$zones[ $country ]->statesOrRegions[] = $all_states[ $country ][ $state ];
-					$variation_state                      = self::remove_signs( $all_states[ $country ][ $state ] );
-					if ( $variation_state !== $all_states[ $country ][ $state ] ) {
-						$zones[ $country ]->statesOrRegions[] = $variation_state;
-					}
+					$zones[ $country ] = $object;
 				}
 			}
+			$current_loops_zones = array();
 		}
 
 		$zones = array_intersect_key( $zones, $shipping_countries );
@@ -962,4 +951,35 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		return isset( $urls[ $region ] ) ? $urls[ $region ] : false;
 	}
 
+	/**
+	 * Returns the most generic restrictions of the 2.
+	 *
+	 * The most generic is the one with the less specifications so the most
+	 * possible generic is the one with empty statesOrRegions and zipCodes properties.
+	 *
+	 * @param stdClass $primary
+	 * @param stdClass $secondary
+	 * @return stdClass
+	 */
+	private static function pick_most_generic_option( stdClass $primary, stdClass $secondary ) {
+		if ( empty( $secondary->statesOrRegions ) && empty( $secondary->zipCodes ) ) { // phpcs:ignore WordPress.NamingConventions
+			return $secondary;
+		}
+
+		if ( empty( $primary->statesOrRegions ) && empty( $primary->zipCodes ) ) { // phpcs:ignore WordPress.NamingConventions
+			return $primary;
+		}
+
+		$primary_states   = ! empty( $primary->statesOrRegions ) ? $primary->statesOrRegions : array(); // phpcs:ignore WordPress.NamingConventions
+		$secondary_states = ! empty( $secondary->statesOrRegions ) ? $secondary->statesOrRegions : array(); // phpcs:ignore WordPress.NamingConventions
+		$primary_zips     = ! empty( $primary->zipCodes ) ? $primary->zipCodes : array(); // phpcs:ignore WordPress.NamingConventions
+		$secondary_zips   = ! empty( $secondary->zipCodes ) ? $secondary->zipCodes : array(); // phpcs:ignore WordPress.NamingConventions
+
+		$return = new stdClass();
+
+		$return->statesOrRegions = array_intersect( $primary_states, $secondary_states ); // phpcs:ignore WordPress.NamingConventions
+		$return->zipCodes        = array_intersect( $primary_zips, $secondary_zips ); // phpcs:ignore WordPress.NamingConventions
+
+		return $return;
+	}
 }
