@@ -303,10 +303,8 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 					case 'postcode':
 						$postcode = $location->code;
 						if ( strstr( $postcode, '...' ) ) {
-							$postcode = array_map( 'intval', explode( '...', $postcode ) );
-							for ( $i = $postcode['0']; $i <= $postcode['1']; $i++ ) {
-								$postcode_rules[] = (string) $i;
-							}
+							$postcode       = explode( '...', $postcode );
+							$postcode_rules = array_merge( $postcode_rules, array_map( 'strval', range( (int) $postcode['0'], (int) $postcode['1'] ) ) );
 						} else {
 							$postcode_rules[] = $postcode;
 						}
@@ -314,9 +312,19 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 				}
 			}
 
+			$postcode_rules = array_unique( $postcode_rules );
+
 			foreach ( $current_loops_zones as $country => $object ) {
 				if ( ! empty( $postcode_rules ) ) {
 					$object->zipCodes = $postcode_rules; // phpcs:ignore WordPress.NamingConventions
+					/**
+					 * If one of the rules was restricting a Region (or more) with postcodes.
+					 * We need to unset the statesOrRegions added, cause Amazon would allow
+					 * the whole Region for shipping if we don't.
+					 */
+					if ( isset( $object->statesOrRegions ) ) { // phpcs:ignore WordPress.NamingConventions
+						unset( $object->statesOrRegions ); // phpcs:ignore WordPress.NamingConventions
+					}
 				}
 				if ( ! empty( $zones[ $country ] ) ) {
 					$zones[ $country ] = self::pick_most_generic_option( $zones[ $country ], $object );

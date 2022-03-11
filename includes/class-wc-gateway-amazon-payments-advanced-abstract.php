@@ -136,6 +136,8 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 
 		add_action( 'woocommerce_amazon_checkout_init', array( $this, 'checkout_init_common' ) );
 
+		add_action( 'woocommerce_shipping_zone_before_methods_table', array( $this, 'postcode_explanation_message' ) );
+
 	}
 
 	/**
@@ -968,5 +970,51 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Displays an explanation/warning in order to make it clear how Amazon Pay
+	 * treats postcode restrictions.
+	 *
+	 * @param WC_Shipping_Zone $zone
+	 * @return void
+	 */
+	public function postcode_explanation_message( $zone ) {
+		$pcodes = false;
+
+		foreach ( $zone->get_zone_locations() as $location ) {
+			if ( 'postcode' === $location->type ) {
+				$pcodes = true;
+				break;
+			}
+		}
+
+		if ( $pcodes ) :
+			?>
+			<div class="notice notice-warning">
+				<p>
+					<strong><?php esc_html_e( 'Amazon Pay Notice:', 'woocommerce-gateway-amazon-payments-advanced' ); ?></strong> 
+					<?php
+					/* translators: 1) Opening b tag. 2) Closing b tag. */
+					printf( esc_html__( 'When using postcodes to restrict shipping locations, a selected zone is required for them to apply and they will apply to %1$sall%2$s the selected zones. So please, restrict accordingly.', 'woocommerce-gateway-amazon-payments-advanced' ), '<b>', '</b>' );
+					?>
+				</p>
+				<p>
+					<?php
+					/* translators: 1) Opening b tag. 2) Closing b tag. */
+					printf( esc_html__( 'Additionally, be careful when specifying ranges. By default WooCommerce supports only %1$sfully numeric ranges%2$s. The same applies for Amazon Pay.', 'woocommerce-gateway-amazon-payments-advanced' ), '<b>', '</b>' );
+					?>
+				</p>
+				<p>
+					<?php
+					esc_html_e(
+						'Ranges covering thousands or more of postcodes may slow down your site, since Amazon Pay does not support postcode ranges we loop from the minimum until we reach the maximum in order to include them all. Try to use the asterisk (*) wildcard when possible for faster loading times.',
+						'woocommerce-gateway-amazon-payments-advanced'
+					);
+					?>
+				</p>
+			</div>
+			<?php
+		endif;
 	}
 }
