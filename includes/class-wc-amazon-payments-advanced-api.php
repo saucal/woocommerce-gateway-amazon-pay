@@ -1,4 +1,6 @@
 <?php
+// phpcs:disable WordPress.NamingConventions
+
 /**
  * Amazon API class.
  *
@@ -245,7 +247,6 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 			}
 		}
 
-		$current_loops_zones = array();
 		foreach ( $raw_zones as $raw_zone ) {
 			$zone    = new WC_Shipping_Zone( $raw_zone );
 			$methods = $zone->get_shipping_methods( true, 'json' );
@@ -254,6 +255,8 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 			}
 
 			$locations = $zone->get_zone_locations( 'json' );
+
+			$current_loops_zones = array();
 
 			/**
 			 * Post code rules will be applied to every country defined by the current zone locations.
@@ -282,21 +285,21 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 						$state          = $location_codes[1];
 						if ( ! isset( $current_loops_zones[ $country ] ) ) {
 							$current_loops_zones[ $country ]                  = new stdClass(); // If we use an empty array it'll be treated as an array in JSON.
-							$current_loops_zones[ $country ]->statesOrRegions = array(); // phpcs:ignore WordPress.NamingConventions
+							$current_loops_zones[ $country ]->statesOrRegions = array();
 						} else {
-							if ( ! isset( $current_loops_zones[ $country ]->statesOrRegions ) ) { // phpcs:ignore WordPress.NamingConventions
+							if ( ! isset( $current_loops_zones[ $country ]->statesOrRegions ) ) {
 								// Do not override anything if the country is allowed fully.
 								break;
 							}
 						}
 
-						$current_loops_zones[ $country ]->statesOrRegions[] = $state; // phpcs:ignore WordPress.NamingConventions
+						$current_loops_zones[ $country ]->statesOrRegions[] = $state;
 						if ( 'US' !== $country ) {
 
-							$current_loops_zones[ $country ]->statesOrRegions[] = $all_states[ $country ][ $state ]; // phpcs:ignore WordPress.NamingConventions
+							$current_loops_zones[ $country ]->statesOrRegions[] = $all_states[ $country ][ $state ];
 							$variation_state                                    = self::remove_signs( $all_states[ $country ][ $state ] );
 							if ( $variation_state !== $all_states[ $country ][ $state ] ) {
-								$current_loops_zones[ $country ]->statesOrRegions[] = $variation_state; // phpcs:ignore WordPress.NamingConventions
+								$current_loops_zones[ $country ]->statesOrRegions[] = $variation_state;
 							}
 						}
 						break;
@@ -304,6 +307,9 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 						$postcode = $location->code;
 						if ( strstr( $postcode, '...' ) ) {
 							$postcode       = explode( '...', $postcode );
+							$postcode_rules = array_merge( $postcode_rules, array_map( 'strval', range( (int) $postcode['0'], (int) $postcode['1'] ) ) );
+						} elseif ( strstr( $postcode, '-' ) ) {
+							$postcode       = explode( '-', $postcode );
 							$postcode_rules = array_merge( $postcode_rules, array_map( 'strval', range( (int) $postcode['0'], (int) $postcode['1'] ) ) );
 						} else {
 							$postcode_rules[] = $postcode;
@@ -316,14 +322,14 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 
 			foreach ( $current_loops_zones as $country => $object ) {
 				if ( ! empty( $postcode_rules ) ) {
-					$object->zipCodes = $postcode_rules; // phpcs:ignore WordPress.NamingConventions
+					$object->zipCodes = $postcode_rules;
 					/**
 					 * If one of the rules was restricting a Region (or more) with postcodes.
 					 * We need to unset the statesOrRegions added, cause Amazon would allow
 					 * the whole Region for shipping if we don't.
 					 */
-					if ( isset( $object->statesOrRegions ) ) { // phpcs:ignore WordPress.NamingConventions
-						unset( $object->statesOrRegions ); // phpcs:ignore WordPress.NamingConventions
+					if ( isset( $object->statesOrRegions ) ) {
+						unset( $object->statesOrRegions );
 					}
 				}
 				if ( ! empty( $zones[ $country ] ) ) {
@@ -332,7 +338,6 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 					$zones[ $country ] = $object;
 				}
 			}
-			$current_loops_zones = array();
 		}
 
 		$zones = array_intersect_key( $zones, $shipping_countries );
@@ -419,12 +424,12 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		}
 		$checkout_session = json_decode( $result['response'] );
 
-		if ( ! empty( $checkout_session->billingAddress ) ) { // phpcs:ignore WordPress.NamingConventions
-			self::normalize_address( $checkout_session->billingAddress ); // phpcs:ignore WordPress.NamingConventions
+		if ( ! empty( $checkout_session->billingAddress ) ) {
+			self::normalize_address( $checkout_session->billingAddress );
 		}
 
-		if ( ! empty( $checkout_session->shippingAddress ) ) { // phpcs:ignore WordPress.NamingConventions
-			self::normalize_address( $checkout_session->shippingAddress ); // phpcs:ignore WordPress.NamingConventions
+		if ( ! empty( $checkout_session->shippingAddress ) ) {
+			self::normalize_address( $checkout_session->shippingAddress );
 		}
 
 		return $checkout_session;
@@ -476,7 +481,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 
 		if ( ! isset( $result['status'] ) || 200 !== $result['status'] ) {
 			wc_apa()->log( sprintf( 'ERROR. Checkout Session ID %s.', $checkout_session_id ), $result );
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		wc_apa()->log( sprintf( 'SUCCESS. Checkout Session ID %s.', $checkout_session_id ), self::sanitize_remote_response_log( $response ) );
@@ -500,7 +505,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 
 		if ( ! isset( $result['status'] ) || ! in_array( $result['status'], array( 200, 202 ), true ) ) {
 			wc_apa()->log( sprintf( 'ERROR. Checkout Session ID %s.', $checkout_session_id ), $result );
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		wc_apa()->log( sprintf( 'SUCCESS. Checkout Session ID %s.', $checkout_session_id ), self::sanitize_remote_response_log( $response ) );
@@ -551,7 +556,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		$response = json_decode( $result['response'] );
 
 		if ( ! isset( $result['status'] ) || 200 !== $result['status'] ) {
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		return $response;
@@ -570,7 +575,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		$response = json_decode( $result['response'] );
 
 		if ( ! isset( $result['status'] ) || 200 !== $result['status'] ) {
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		return $response;
@@ -589,7 +594,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		$response = json_decode( $result['response'] );
 
 		if ( ! isset( $result['status'] ) || 200 !== $result['status'] ) {
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		return $response;
@@ -629,7 +634,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		// TODO: Validate entered data.
 		if ( empty( $data['captureAmount'] ) ) {
 			$charge                = self::get_charge( $charge_id );
-			$data['captureAmount'] = (array) $charge->chargeAmount; // phpcs:ignore WordPress.NamingConventions
+			$data['captureAmount'] = (array) $charge->chargeAmount;
 			// TODO: Test with lower amount of captured than charge (multiple charges per capture).
 		}
 
@@ -658,7 +663,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 
 		if ( ! isset( $result['status'] ) || ! in_array( $result['status'], array( 200, 201 ), true ) ) {
 			wc_apa()->log( sprintf( 'ERROR. Charge ID %s.', $charge_id ), $result );
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		wc_apa()->log( sprintf( 'SUCCESS. Charge ID %s.', $charge_id ), self::sanitize_remote_response_log( $response ) );
@@ -683,8 +688,8 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		// TODO: Validate entered data.
 		if ( empty( $data['refundAmount'] ) ) {
 			$charge                          = self::get_charge( $charge_id );
-			$data['refundAmount']            = (array) $charge->captureAmount; // phpcs:ignore WordPress.NamingConventions
-			$data['refundAmount']['amount'] -= (float) $charge->refundedAmount->amount; // phpcs:ignore WordPress.NamingConventions
+			$data['refundAmount']            = (array) $charge->captureAmount;
+			$data['refundAmount']['amount'] -= (float) $charge->refundedAmount->amount;
 		}
 		if ( ! is_null( $amount ) ) {
 			$data['refundAmount']['amount'] = $amount;
@@ -714,7 +719,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 
 		if ( ! isset( $result['status'] ) || ! in_array( $result['status'], array( 200, 201 ), true ) ) {
 			wc_apa()->log( sprintf( 'ERROR. Charge ID %s.', $charge_id ), $result );
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		wc_apa()->log( sprintf( 'SUCCESS. Charge ID %s.', $charge_id ), self::sanitize_remote_response_log( $response ) );
@@ -744,7 +749,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 
 		if ( ! isset( $result['status'] ) || ! in_array( $result['status'], array( 200, 201 ), true ) ) {
 			wc_apa()->log( sprintf( 'ERROR. Charge ID %s.', $charge_id ), $result );
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		wc_apa()->log( sprintf( 'SUCCESS. Charge ID %s.', $charge_id ), self::sanitize_remote_response_log( $response ) );
@@ -833,7 +838,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		// TODO: Validate entered data.
 		if ( empty( $data['chargeAmount'] ) ) {
 			$charge_permission    = self::get_charge_permission( $charge_permission_id );
-			$data['chargeAmount'] = (array) $charge_permission->limits->amountBalance; // phpcs:ignore WordPress.NamingConventions
+			$data['chargeAmount'] = (array) $charge_permission->limits->amountBalance;
 		}
 
 		$headers = self::get_extra_headers( __FUNCTION__ );
@@ -860,7 +865,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 
 		if ( ! isset( $result['status'] ) || ! in_array( $result['status'], array( 200, 201 ), true ) ) {
 			wc_apa()->log( sprintf( 'ERROR. Charge Permission ID %s.', $charge_permission_id ), $result );
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		wc_apa()->log( sprintf( 'SUCCESS. Charge Permission ID %s.', $charge_permission_id ), self::sanitize_remote_response_log( $response ) );
@@ -894,7 +899,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 
 		if ( ! isset( $result['status'] ) || ! in_array( $result['status'], array( 200, 201 ), true ) ) {
 			wc_apa()->log( sprintf( 'ERROR. Charge Permission ID %s.', $charge_permission_id ), $result );
-			return new WP_Error( $response->reasonCode, $response->message ); // phpcs:ignore WordPress.NamingConventions
+			return new WP_Error( $response->reasonCode, $response->message );
 		}
 
 		wc_apa()->log( sprintf( 'SUCCESS. Charge Permission ID %s.', $charge_permission_id ), self::sanitize_remote_response_log( $response ) );
@@ -970,23 +975,23 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 	 * @return stdClass
 	 */
 	private static function pick_most_generic_option( stdClass $primary, stdClass $secondary ) {
-		if ( empty( $secondary->statesOrRegions ) && empty( $secondary->zipCodes ) ) { // phpcs:ignore WordPress.NamingConventions
+		if ( empty( $secondary->statesOrRegions ) && empty( $secondary->zipCodes ) ) {
 			return $secondary;
 		}
 
-		if ( empty( $primary->statesOrRegions ) && empty( $primary->zipCodes ) ) { // phpcs:ignore WordPress.NamingConventions
+		if ( empty( $primary->statesOrRegions ) && empty( $primary->zipCodes ) ) {
 			return $primary;
 		}
 
-		$primary_states   = ! empty( $primary->statesOrRegions ) ? $primary->statesOrRegions : array(); // phpcs:ignore WordPress.NamingConventions
-		$secondary_states = ! empty( $secondary->statesOrRegions ) ? $secondary->statesOrRegions : array(); // phpcs:ignore WordPress.NamingConventions
-		$primary_zips     = ! empty( $primary->zipCodes ) ? $primary->zipCodes : array(); // phpcs:ignore WordPress.NamingConventions
-		$secondary_zips   = ! empty( $secondary->zipCodes ) ? $secondary->zipCodes : array(); // phpcs:ignore WordPress.NamingConventions
+		$primary_states   = ! empty( $primary->statesOrRegions ) ? $primary->statesOrRegions : array();
+		$secondary_states = ! empty( $secondary->statesOrRegions ) ? $secondary->statesOrRegions : array();
+		$primary_zips     = ! empty( $primary->zipCodes ) ? $primary->zipCodes : array();
+		$secondary_zips   = ! empty( $secondary->zipCodes ) ? $secondary->zipCodes : array();
 
 		$return = new stdClass();
 
-		$return->statesOrRegions = array_intersect( $primary_states, $secondary_states ); // phpcs:ignore WordPress.NamingConventions
-		$return->zipCodes        = array_intersect( $primary_zips, $secondary_zips ); // phpcs:ignore WordPress.NamingConventions
+		$return->statesOrRegions = array_intersect( $primary_states, $secondary_states );
+		$return->zipCodes        = array_intersect( $primary_zips, $secondary_zips );
 
 		return $return;
 	}

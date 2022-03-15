@@ -995,14 +995,14 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 				<p>
 					<strong><?php esc_html_e( 'Amazon Pay Notice:', 'woocommerce-gateway-amazon-payments-advanced' ); ?></strong> 
 					<?php
-					/* translators: 1) Opening b tag. 2) Closing b tag. */
-					printf( esc_html__( 'When using postcodes to restrict shipping locations, a selected zone is required for them to apply and they will apply to %1$sall%2$s the selected zones. So please, restrict accordingly.', 'woocommerce-gateway-amazon-payments-advanced' ), '<b>', '</b>' );
+					/* translators: 1) Opening strong tag. 2) Closing strong tag. */
+					printf( esc_html__( 'When using postcodes to restrict shipping locations, a selected zone is required for them to apply and they will apply to %1$sall%2$s the selected zones. So please, restrict accordingly.', 'woocommerce-gateway-amazon-payments-advanced' ), '<strong>', '</strong>' );
 					?>
 				</p>
 				<p>
 					<?php
-					/* translators: 1) Opening b tag. 2) Closing b tag. */
-					printf( esc_html__( 'Additionally, be careful when specifying ranges. By default WooCommerce supports only %1$sfully numeric ranges%2$s. The same applies for Amazon Pay.', 'woocommerce-gateway-amazon-payments-advanced' ), '<b>', '</b>' );
+					/* translators: 1) Opening strong tag. 2) Closing strong tag. */
+					printf( esc_html__( 'Additionally, be careful when specifying ranges. By default WooCommerce supports only %1$sfully numeric ranges%2$s. The same applies for Amazon Pay.', 'woocommerce-gateway-amazon-payments-advanced' ), '<strong>', '</strong>' );
 					?>
 				</p>
 				<p>
