@@ -307,10 +307,8 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 						$postcode = $location->code;
 						if ( strstr( $postcode, '...' ) ) {
 							$postcode       = explode( '...', $postcode );
-							$postcode_rules = array_merge( $postcode_rules, array_map( 'strval', range( (int) $postcode['0'], (int) $postcode['1'] ) ) );
-						} elseif ( strstr( $postcode, '-' ) ) {
-							$postcode       = explode( '-', $postcode );
-							$postcode_rules = array_merge( $postcode_rules, array_map( 'strval', range( (int) $postcode['0'], (int) $postcode['1'] ) ) );
+							$postcode_rules = array_merge( $postcode_rules, self::convert_range_to_wildcards( (int) $postcode['0'], (int) $postcode['1'] ) );
+							// $postcode_rules = array_merge( $postcode_rules, array_map( 'strval', range( (int) $postcode['0'], (int) $postcode['1'] ) ) );
 						} else {
 							$postcode_rules[] = $postcode;
 						}
@@ -994,5 +992,83 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		$return->zipCodes        = array_intersect( $primary_zips, $secondary_zips );
 
 		return $return;
+	}
+
+	private static function convert_range_to_wildcards( int $min, int $max ) {
+		$diff = $max - $min;
+
+		$diff_length = strlen( (string) $diff );
+
+		if ( $diff_length - 2 <= 0 ) {
+			return array_map( 'strval', range( $min, $max ) );
+		}
+
+		$mins = array();
+		$meds = array();
+		$maxs = array();
+
+		$min_upper_limit = round( $min + 5, -1 );
+		$max_lower_limit = round( $max - 5, -1 ) + 1;
+
+		for ( $i = $min; $i < $min_upper_limit; $i++ ) {
+			$mins[] = $i;
+		}
+
+		$i    = $min_upper_limit;
+		$step = self::determine_step( 0, $i, $max_lower_limit );
+		do {
+			$meds[] = self::get_in_between_wildcard_numbers( $i, $step );
+			$i     += $step;
+			$step   = self::determine_step( $step, $i, $max_lower_limit );
+		} while ( self::there_are_more_steps( $i, $step, $max_lower_limit ) );
+
+		$meds = array_merge( $meds, self::possible_remaining_numbers( $i, $max_lower_limit ) );
+
+		for ( $i = $max_lower_limit - 1; $i <= $max; $i++ ) {
+			$maxs[] = $i;
+		}
+
+		return array_unique( array_map( 'strval', array_merge( $mins, $meds, $maxs ) ) );
+	}
+
+	private static function determine_step( int $current_step, int $start, int $target ) {
+		$step_start = pow( 10, strlen( (string) $start ) - 1 );
+		if ( $start + $step_start > $target ) {
+			// Try to lower the step now.
+			if ( 10 >= $current_step ) {
+				return $current_step;
+			} else {
+				$done = 0;
+				while ( $start + $step_start > $target && $done < 10 ) {
+					$step_start = $step_start / 10;
+					$done++;
+				}
+				return $step_start + $start > $target ? $current_step : $step_start;
+			}
+		}
+		return $step_start;
+	}
+
+	private static function get_in_between_wildcard_numbers( int $from, int $offset ) {
+		$temp = substr( (string) $from, 0, strlen( (string) $from ) - strlen( (string) $offset ) + 1 );
+		$diff = strlen( (string) $from ) - strlen( $temp );
+		for ( $j = 0; $j < $diff; $j++ ) {
+			$temp .= '?';
+		}
+		return $temp;
+	}
+
+	private static function there_are_more_steps( $start, $offset, $max ) {
+		return $start + $offset < $max;
+	}
+
+	private static function possible_remaining_numbers( $start, $end ) {
+		if ( $start + 1 >= $end ) {
+			return array();
+		}
+		$range = range( $start, $end );
+		array_shift( $range );
+		array_pop( $range );
+		return $range;
 	}
 }
