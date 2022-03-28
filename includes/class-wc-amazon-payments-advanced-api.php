@@ -312,10 +312,10 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 					case 'postcode':
 						$postcode = $location->code;
 						if ( strstr( $postcode, '...' ) ) {
-							$pers_ps_array  = get_transient( 'woocommerce_amazon_pa_ps_rules_'. self::RANGE_TO_WILDCARDS_ALGO_VERSION . '_' . md5( $postcode ) );
+							$pers_ps_array = get_transient( 'woocommerce_amazon_pa_ps_rules_' . self::RANGE_TO_WILDCARDS_ALGO_VERSION . '_' . md5( $postcode ) );
 							if ( false === $pers_ps_array ) {
-								$pcode_parts    = explode( '...', $postcode );
-								$pers_ps_array  = self::convert_range_to_wildcards( (int) $pcode_parts['0'], (int) $pcode_parts['1'] );
+								$pcode_parts   = explode( '...', $postcode );
+								$pers_ps_array = self::convert_range_to_wildcards( (int) $pcode_parts['0'], (int) $pcode_parts['1'] );
 								set_transient( 'woocommerce_amazon_pa_ps_rules_' . self::RANGE_TO_WILDCARDS_ALGO_VERSION . '_' . md5( $postcode ), $pers_ps_array, MONTH_IN_SECONDS );
 							}
 							$postcode_rules = array_merge( $postcode_rules, $pers_ps_array );
@@ -1011,7 +1011,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 	 * so we convert those ranges to array using wildcard for efficiency.
 	 *
 	 * example if the client specified 1...10000 this function will return
-	 * 
+	 *
 	 * array( '?', '??', '???', '????', 10000 );
 	 *
 	 * @param int $min The start of the range of numbers to be included.
@@ -1143,9 +1143,9 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 	 */
 	private static function num_optimizations( array $array ) {
 		$array = array_flip( array_unique( $array ) );
-		
+
 		for ( $j = 0; $j < 6; $j ++ ) {
-			$isset = true;
+			$isset    = true;
 			$to_unset = array();
 			for ( $i = 1; $i < 10; $i ++ ) {
 				if ( ! isset( $array[ $i . str_repeat( '?', $j ) ] ) ) {
