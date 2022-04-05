@@ -113,7 +113,7 @@ class WC_Amazon_Payments_Advanced_Helper {
 		$step_start = pow( 10, strlen( (string) $start ) - 1 );
 		if ( $start + $step_start > $target ) {
 			// Try to lower the step now.
-			if ( 10 >= $current_step ) {
+			if ( $current_step && 10 >= $current_step ) {
 				return $current_step;
 			} else {
 				$done = 0;
