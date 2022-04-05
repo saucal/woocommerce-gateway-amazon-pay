@@ -66,6 +66,42 @@ class WC_Amazon_Payments_Advanced_Helper {
 	}
 
 	/**
+	 * Adds leading zeros that could have been removed
+	 * from the converted to wildcards ranges, when being cast to numbers.
+	 *
+	 * @param array $converted The converted to wildcards ranges.
+	 * @param array $originals The original numbers.
+	 * @return array
+	 */
+	public static function maybe_re_add_leading_zeros( array $converted, array $originals ) {
+		if ( empty( $originals['0'] ) || empty( $originals['1'] ) ) {
+			return $converted;
+		}
+
+		$min_cast_to_int = (int) $originals['0'];
+		$max_cast_to_int = (int) $originals['1'];
+
+		if ( strlen( $originals['0'] ) === strlen( (string) $min_cast_to_int ) && strlen( $originals['1'] ) === strlen( (string) $max_cast_to_int ) ) {
+			return $converted;
+		}
+
+		$min_diff = strlen( $originals['0'] ) - strlen( (string) $min_cast_to_int );
+		$max_diff = strlen( $originals['1'] ) - strlen( (string) $max_cast_to_int );
+
+		if ( $min_diff !== $max_diff ) {
+			return $converted;
+		}
+
+		if ( substr( $originals['0'], 0, $min_diff ) !== str_repeat( '0', $min_diff ) ) {
+			return $converted;
+		}
+
+		return array_map( function ( $v ) use ( $min_diff ) {
+			return str_repeat( '0', $min_diff ) . $v;
+		}, $converted );
+	}
+
+	/**
 	 * Determines with what step the next batch of numbers can be included.
 	 *
 	 * @param int $current_step The current step

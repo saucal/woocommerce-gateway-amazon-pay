@@ -304,11 +304,14 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 						}
 						break;
 					case 'postcode':
+						/* We can't handle numbers longer than the PHP_INT_MAX's length. */
+						$max_int_lenght_we_can_handle = strlen( (string) PHP_INT_MAX );
+
 						$postcode = $location->code;
-						if ( strstr( $postcode, '...' ) ) {
+						if ( strstr( $postcode, '...' ) && preg_match( sprintf( '/^(\d{0,%1$d})([.]{3})(\d{0,%1$d})*$/', $max_int_lenght_we_can_handle ), $postcode ) ) {
 							$pcode_parts    = explode( '...', $postcode );
 							$pers_ps_array  = WC_Amazon_Payments_Advanced_Helper::convert_range_to_wildcards( (int) $pcode_parts['0'], (int) $pcode_parts['1'] );
-							$postcode_rules = array_merge( $postcode_rules, $pers_ps_array );
+							$postcode_rules = array_merge( $postcode_rules, WC_Amazon_Payments_Advanced_Helper::maybe_re_add_leading_zeros( $pers_ps_array, $pcode_parts ) );
 						} else {
 							$postcode_rules[] = $postcode;
 						}
