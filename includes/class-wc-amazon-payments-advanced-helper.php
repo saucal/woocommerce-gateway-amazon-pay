@@ -40,8 +40,12 @@ class WC_Amazon_Payments_Advanced_Helper {
 		$min_upper_limit = round( $min + 5, -1 );
 		$max_lower_limit = round( $max - 5, -1 ) + 1;
 
+		/* Keeping track of where mins could be included as a wildcard or one-by-one. */
+		$used_wild_card_mins = false;
+
 		if ( (int) $min_upper_limit - $min === 10 ) {
-			$mins[] = substr( (string) $min, 0, strlen( (string) $min ) - 1 ) . '?';
+			$mins[]              = substr( (string) $min, 0, strlen( (string) $min ) - 1 ) . '?';
+			$used_wild_card_mins = true;
 		} else {
 			for ( $i = $min; $i < $min_upper_limit; $i++ ) {
 				$mins[] = (string) $i;
@@ -50,6 +54,24 @@ class WC_Amazon_Payments_Advanced_Helper {
 
 		$i    = $min_upper_limit;
 		$step = self::determine_step( 0, $i, $max_lower_limit );
+
+		/**
+		 * If the mins were included as a wildcard and the first step is hight than 10,
+		 * we can and we should reset the mids initial values.
+		 * 
+		 * Example: when min is 99300 and max is 99400, min_upper_limit is 99310
+		 * so in the mins we have included already 9930? and the i is 99310 as a result
+		 * and the step is 100. so the next iteration of i would be 99410 meaning we will
+		 * skip from including the numbers between 99400 and 99409 and going on.
+		 *
+		 * Resetting based on the conditionals below, resolves that issue.
+		 */
+		if ( $used_wild_card_mins && $step > 10 ) {
+			$i    = $min;
+			$mins = array();
+			$step = self::determine_step( 0, $i, $max_lower_limit );
+		}
+
 		do {
 			$meds[] = self::get_in_between_wildcard_numbers( $i, $step );
 			$i     += $step;
