@@ -991,8 +991,11 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 
 		$return = new stdClass();
 
-		$return->statesOrRegions = array_intersect( $primary_states, $secondary_states );
-		$return->zipCodes        = array_intersect( $primary_zips, $secondary_zips );
+		/**
+		 * In this stage we want both of the defined restrictions to be allowed. Som merging is the way.
+		 */
+		$return->statesOrRegions = array_unique( array_merge( $primary_states, $secondary_states ) );
+		$return->zipCodes        = array_unique( array_merge( $primary_zips, $secondary_zips ) );
 
 		return $return;
 	}

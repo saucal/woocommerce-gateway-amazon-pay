@@ -235,7 +235,6 @@ class WC_Amazon_Payments_Advanced_Helper {
 	 * Example: If in the incoming array the values '1?', '2?', '3? ... '9?' are present,
 	 * they will be replaced by one value '??'.
 	 *
-	 * 1?????
 	 * The same would happen for '1??', '2??' etc...
 	 *
 	 * @param array $array Array already containing range converted to wildcards.
