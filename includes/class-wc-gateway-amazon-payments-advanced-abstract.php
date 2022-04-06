@@ -976,7 +976,7 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 	 * Displays an explanation/warning in order to make it clear how Amazon Pay
 	 * treats postcode restrictions.
 	 *
-	 * @param WC_Shipping_Zone $zone
+	 * @param WC_Shipping_Zone $zone The shipping zone.
 	 * @return void
 	 */
 	public function postcode_explanation_message( $zone ) {
@@ -1008,7 +1008,15 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 				<p>
 					<?php
 					esc_html_e(
-						'Ranges covering thousands or more of postcodes may slow down your site, since Amazon Pay does not support postcode ranges we loop from the minimum until we reach the maximum in order to include them all. Try to use the asterisk (*) wildcard when possible for faster loading times.',
+						'Prefer using the asterisk(*) wildcard whenever possible. Amazon API does not support postcode ranges, so we convert the specified ranges using a wildcard(?) supported by Amazon API. The range 1...1000 would be sent to Amazon as ( "?", "??", "???", 1000 ) for example.',
+						'woocommerce-gateway-amazon-payments-advanced'
+					);
+					?>
+				</p>
+				<p>
+					<?php
+					esc_html_e(
+						'We also support postcode ranges including a dash(-). The only restriction, for the time being at least, is that the dash needs to be in the same position in the minimum and maximum values of the range. So we would support a range like this 1234-000...9999-999, but we wouldn\'t this one 1-000...9999-999.',
 						'woocommerce-gateway-amazon-payments-advanced'
 					);
 					?>

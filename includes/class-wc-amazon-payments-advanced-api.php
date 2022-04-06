@@ -1,6 +1,4 @@
-<?php
-// phpcs:disable WordPress.NamingConventions
-
+<?php // phpcs:disable WordPress.NamingConventions
 /**
  * Amazon API class.
  *
@@ -265,6 +263,8 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 			$postcode_rules = array();
 
 			/**
+			 * Parsing WooCommerce's shipping restrictions to Amazon Pay compatible restrictions.
+			 *
 			 * @see https://developer.amazon.com/docs/amazon-pay-api-v2/checkout-session.html#type-restriction
 			 */
 			foreach ( $locations as $location ) {
@@ -971,8 +971,8 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 	 * The most generic is the one with the less specifications so the most
 	 * possible generic is the one with empty statesOrRegions and zipCodes properties.
 	 *
-	 * @param stdClass $primary
-	 * @param stdClass $secondary
+	 * @param stdClass $primary The primary choice.
+	 * @param stdClass $secondary The secondary choice.
 	 * @return stdClass
 	 */
 	private static function pick_most_generic_option( stdClass $primary, stdClass $secondary ) {

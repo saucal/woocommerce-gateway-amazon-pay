@@ -24,7 +24,7 @@ class WC_Amazon_Payments_Advanced_Helper {
 	 * @param int $max The end of the range of numbers to be included.
 	 * @return array
 	 */
-	public static function convert_range_to_wildcards( int $min, int $max ) {
+	public static function convert_range_to_wildcards( int $min, int $max ) { // phpcs:ignore PHPCompatibility.FunctionDeclarations.NewParamTypeDeclarations.intFound
 		$diff = $max - $min;
 
 		$diff_length = strlen( (string) $diff );
@@ -43,7 +43,7 @@ class WC_Amazon_Payments_Advanced_Helper {
 		/* Keeping track of where mins could be included as a wildcard or one-by-one. */
 		$used_wild_card_mins = false;
 
-		if ( (int) $min_upper_limit - $min === 10 ) {
+		if ( 10 === (int) $min_upper_limit - $min ) {
 			$mins[]              = substr( (string) $min, 0, strlen( (string) $min ) - 1 ) . '?';
 			$used_wild_card_mins = true;
 		} else {
@@ -161,12 +161,12 @@ class WC_Amazon_Payments_Advanced_Helper {
 	/**
 	 * Determines with what step the next batch of numbers can be included.
 	 *
-	 * @param int $current_step The current step
-	 * @param int $start        The current offset
-	 * @param int $target       The maximum offset
+	 * @param int $current_step The current step.
+	 * @param int $start        The current offset.
+	 * @param int $target       The maximum offset.
 	 * @return int
 	 */
-	private static function determine_step( int $current_step, int $start, int $target ) {
+	private static function determine_step( int $current_step, int $start, int $target ) { // phpcs:ignore PHPCompatibility.FunctionDeclarations.NewParamTypeDeclarations.intFound
 		$step_start = pow( 10, strlen( (string) $start ) - 1 );
 		if ( $start + $step_start > $target ) {
 			// Try to lower the step now.
@@ -191,7 +191,7 @@ class WC_Amazon_Payments_Advanced_Helper {
 	 * @param integer $offset Where the inclusion should end.
 	 * @return string
 	 */
-	private static function get_in_between_wildcard_numbers( int $from, int $offset ) {
+	private static function get_in_between_wildcard_numbers( int $from, int $offset ) { // phpcs:ignore PHPCompatibility.FunctionDeclarations.NewParamTypeDeclarations.intFound
 		$temp = substr( (string) $from, 0, strlen( (string) $from ) - strlen( (string) $offset ) + 1 );
 		$diff = strlen( (string) $from ) - strlen( $temp );
 		for ( $j = 0; $j < $diff; $j++ ) {
@@ -237,7 +237,7 @@ class WC_Amazon_Payments_Advanced_Helper {
 	 *
 	 * The same would happen for '1??', '2??' etc...
 	 *
-	 * @param array $array
+	 * @param array $array Array already containing range converted to wildcards.
 	 * @return array
 	 */
 	private static function num_optimizations( array $array ) {
