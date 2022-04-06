@@ -319,7 +319,7 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 				}
 			}
 
-			$postcode_rules = array_unique( $postcode_rules );
+			$postcode_rules = array_unique( array_map( 'strval', $postcode_rules ) );
 
 			foreach ( $current_loops_zones as $country => $object ) {
 				if ( ! empty( $postcode_rules ) ) {
