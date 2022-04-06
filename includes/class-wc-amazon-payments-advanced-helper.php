@@ -58,7 +58,7 @@ class WC_Amazon_Payments_Advanced_Helper {
 		/**
 		 * If the mins were included as a wildcard and the first step is hight than 10,
 		 * we can and we should reset the mids initial values.
-		 * 
+		 *
 		 * Example: when min is 99300 and max is 99400, min_upper_limit is 99310
 		 * so in the mins we have included already 9930? and the i is 99310 as a result
 		 * and the step is 100. so the next iteration of i would be 99410 meaning we will
@@ -118,9 +118,44 @@ class WC_Amazon_Payments_Advanced_Helper {
 			return $converted;
 		}
 
-		return array_map( function ( $v ) use ( $min_diff ) {
-			return str_repeat( '0', $min_diff ) . $v;
-		}, $converted );
+		return array_map(
+			function ( $v ) use ( $min_diff ) {
+				return str_repeat( '0', $min_diff ) . $v;
+			},
+			$converted
+		);
+	}
+
+	/**
+	 * Adds dashes that could have been removed from the converted
+	 * to wildcards ranges, when being cast to numbers.
+	 *
+	 * @param array $converted The converted to wildcards ranges.
+	 * @param array $originals The original numbers.
+	 * @return array
+	 */
+	public static function maybe_re_add_dashes( array $converted, array $originals ) {
+		if ( empty( $originals['0'] ) || empty( $originals['1'] ) ) {
+			return $converted;
+		}
+
+		if ( ! strstr( $originals['0'], '-' ) || ! strstr( $originals['1'], '-' ) ) {
+			return $converted;
+		}
+
+		$min_offset = strpos( $originals['0'], '-' );
+		$max_offset = strpos( $originals['1'], '-' );
+
+		if ( $min_offset !== $max_offset ) {
+			return $converted;
+		}
+
+		return array_map(
+			function( $v ) use ( $min_offset ) {
+				return substr( $v, 0, $min_offset ) . '-' . substr( $v, $min_offset );
+			},
+			$converted
+		);
 	}
 
 	/**
