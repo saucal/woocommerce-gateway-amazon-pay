@@ -2,8 +2,8 @@
 Contributors: woocommerce, automattic, woothemes, akeda, jeffstieler, mikejolley, bor0, claudiosanches, royho, jamesrrodger, laurendavissmith001, dwainm, danreylop
 Tags: woocommerce, amazon, checkout, payments, e-commerce, ecommerce
 Requires at least: 4.4
-Tested up to: 5.7
-Stable tag: 2.1.1
+Tested up to: 6.0
+Stable tag: 2.2.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -53,6 +53,28 @@ WordPress codex contains [instructions on how to do this here](http://codex.word
 Automatic updates should work like a charm; as always though, ensure you backup your site just in case.
 
 == Changelog ==
+
+= 2.2.0 - 2022-05-30 =
+
+* Add - Make Amazon Pay available as a traditional gateway option.
+* Add - Support Alexa Delivery notifications.
+* Add - Support Amazon Pay "Classic" on the checkout block of WooCommerce blocks.
+* Fix - Render Amazon Pay buttons even if they are not visible.
+* Fix - Prevents a JavaScript fatal when rendering Amazon Pay button.
+* Fix - Make Amazon Pay available for supported currencies only.
+* Dev - Bumped tested up to WordPress v6.0.
+
+= 2.1.3 - 2022-04-11 =
+* Fix - Amazon Pay shouldn't be available when not supported currency selected.
+* Dev - Bumped tested up to WordPress 5.9.
+
+= 2.1.2 - 2022-03-17 =
+* Fix - Payment fails when site name is longer than 50 characters.
+* Fix - Payment fails when recurring payment frequency is passed as an integer.
+* Fix - Order changes status to 'Failed' during payment processing.
+* Fix - Error opening subscriptions details due to internal errors.
+* Fix - Multiple pay buttons showing on shipping method change (thank you gyopiazza).
+* Fix - Additional way of identifying order id on return.
 
 = 2.1.1 - 2022-02-03 =
 * Fix - Honoring WooCommerce's setting for decimals when formatting numbers.
