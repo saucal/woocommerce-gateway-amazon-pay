@@ -24,67 +24,30 @@ class WC_Amazon_Payments_Advanced_Helper {
 	 * @param int $max The end of the range of numbers to be included.
 	 * @return array
 	 */
-	public static function convert_range_to_wildcards( int $min, int $max ) { // phpcs:ignore PHPCompatibility.FunctionDeclarations.NewParamTypeDeclarations.intFound
-		$diff = $max - $min;
-
-		$diff_length = strlen( (string) $diff );
-
-		if ( $diff_length - 2 <= 0 ) {
-			return array_map( 'strval', range( $min, $max ) );
-		}
-
-		$mins = array();
-		$meds = array();
-		$maxs = array();
-
-		$min_upper_limit = round( $min + 5, -1 );
-		$max_lower_limit = round( $max - 5, -1 ) + 1;
-
-		/* Keeping track of where mins could be included as a wildcard or one-by-one. */
-		$used_wild_card_mins = false;
-
-		if ( 10 === (int) $min_upper_limit - $min ) {
-			$mins[]              = substr( (string) $min, 0, strlen( (string) $min ) - 1 ) . '?';
-			$used_wild_card_mins = true;
-		} else {
-			for ( $i = $min; $i < $min_upper_limit; $i++ ) {
-				$mins[] = (string) $i;
+	public static function convert_range_to_wildcards( $start, $end ) {
+		while( $start <= $end ) {
+			$shift = 0;
+			$multiple = 1;
+			$done = false;
+			$over = false;
+			$fits = true;
+			while( ! ( $done || $over ) && $fits ) {
+				$multiple *= 10;
+				$shift += 1;
+				$next_value = intval( $start / $multiple ) * $multiple + $multiple;
+				$done = $next_value === ( $end + 1 );
+				$over = $next_value > ( $end + 1 );
+				$fits = intval( $start / $multiple ) === intval( ( $start + $multiple - 1 ) / $multiple );
+				
+				if ( $over || ! $fits ) {
+					$multiple = intval( $multiple / 10 );
+					$shift -= 1;
+				}
 			}
+			
+			yield strval( intval( $start / $multiple ) ) . str_repeat( '?', $shift );
+			$start += $multiple;
 		}
-
-		$i    = $min_upper_limit;
-		$step = self::determine_step( 0, $i, $max_lower_limit );
-
-		/**
-		 * If the mins were included as a wildcard and the first step is hight than 10,
-		 * we can and we should reset the mids initial values.
-		 *
-		 * Example: when min is 99300 and max is 99400, min_upper_limit is 99310
-		 * so in the mins we have included already 9930? and the i is 99310 as a result
-		 * and the step is 100. so the next iteration of i would be 99410 meaning we will
-		 * skip from including the numbers between 99400 and 99409 and going on.
-		 *
-		 * Resetting based on the conditionals below, resolves that issue.
-		 */
-		if ( $used_wild_card_mins && $step > 10 ) {
-			$i    = $min;
-			$mins = array();
-			$step = self::determine_step( 0, $i, $max_lower_limit );
-		}
-
-		do {
-			$meds[] = self::get_in_between_wildcard_numbers( $i, $step );
-			$i     += $step;
-			$step   = self::determine_step( $step, $i, $max_lower_limit );
-		} while ( self::there_are_more_steps( $i, $step, $max_lower_limit ) );
-
-		$meds = array_merge( $meds, self::possible_remaining_numbers( $i, $max_lower_limit ) );
-
-		for ( $i = $max_lower_limit - 1; $i <= $max; $i++ ) {
-			$maxs[] = (string) $i;
-		}
-
-		return self::num_optimizations( array_merge( $mins, $meds, $maxs ) );
 	}
 
 	/**
@@ -159,77 +122,6 @@ class WC_Amazon_Payments_Advanced_Helper {
 	}
 
 	/**
-	 * Determines with what step the next batch of numbers can be included.
-	 *
-	 * @param int $current_step The current step.
-	 * @param int $start        The current offset.
-	 * @param int $target       The maximum offset.
-	 * @return int
-	 */
-	private static function determine_step( int $current_step, int $start, int $target ) { // phpcs:ignore PHPCompatibility.FunctionDeclarations.NewParamTypeDeclarations.intFound
-		$step_start = pow( 10, strlen( (string) $start ) - 1 );
-		if ( $start + $step_start > $target ) {
-			// Try to lower the step now.
-			if ( $current_step && 10 >= $current_step ) {
-				return $current_step;
-			} else {
-				$done = 0;
-				while ( $start + $step_start > $target && $done < 10 ) {
-					$step_start = $step_start / 10;
-					$done++;
-				}
-				return $step_start + $start > $target ? $current_step : $step_start;
-			}
-		}
-		return $step_start;
-	}
-
-	/**
-	 * Returns the numbers in a wildcard format
-	 *
-	 * @param integer $from   Where to start including from.
-	 * @param integer $offset Where the inclusion should end.
-	 * @return string
-	 */
-	private static function get_in_between_wildcard_numbers( int $from, int $offset ) { // phpcs:ignore PHPCompatibility.FunctionDeclarations.NewParamTypeDeclarations.intFound
-		$temp = substr( (string) $from, 0, strlen( (string) $from ) - strlen( (string) $offset ) + 1 );
-		$diff = strlen( (string) $from ) - strlen( $temp );
-		for ( $j = 0; $j < $diff; $j++ ) {
-			$temp .= '?';
-		}
-		return $temp;
-	}
-
-	/**
-	 * Returns if there are more steps.
-	 *
-	 * @param int $start  The current number.
-	 * @param int $offset The active step.
-	 * @param int $max    The maximum number.
-	 * @return bool
-	 */
-	private static function there_are_more_steps( $start, $offset, $max ) {
-		return $start + $offset < $max;
-	}
-
-	/**
-	 * Checks if there are numbers that should be included but they weren't.
-	 *
-	 * @param int $start Current number.
-	 * @param int $end   Maximum number.
-	 * @return array
-	 */
-	private static function possible_remaining_numbers( $start, $end ) {
-		if ( $start + 1 >= $end ) {
-			return array();
-		}
-		$range = range( $start, $end );
-		array_shift( $range );
-		array_pop( $range );
-		return array_map( 'strval', $range );
-	}
-
-	/**
 	 * Optimizes the final returned array.
 	 *
 	 * Example: If in the incoming array the values '1?', '2?', '3? ... '9?' are present,
@@ -240,7 +132,7 @@ class WC_Amazon_Payments_Advanced_Helper {
 	 * @param array $array Array already containing range converted to wildcards.
 	 * @return array
 	 */
-	private static function num_optimizations( array $array ) {
+	public static function num_optimizations( array $array ) {
 		$array = array_flip( array_unique( $array ) );
 
 		for ( $j = 0; $j < 6; $j ++ ) {

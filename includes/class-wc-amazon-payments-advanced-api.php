@@ -320,7 +320,11 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 						$postcode = $location->code;
 						if ( strstr( $postcode, '...' ) && preg_match( sprintf( '/^([-\d]{0,%1$d})([.]{3})([-\d]{0,%1$d})*$/', $max_int_lenght_we_can_handle + ( strstr( $postcode, '-' ) ? 1 : 0 ) ), $postcode ) ) {
 							$pcode_parts    = explode( '...', $postcode );
-							$pers_ps_array  = WC_Amazon_Payments_Advanced_Helper::convert_range_to_wildcards( (int) str_replace( '-', '', $pcode_parts['0'] ), (int) str_replace( '-', '', $pcode_parts['1'] ) );
+							$pers_ps_array  = array();
+							foreach ( WC_Amazon_Payments_Advanced_Helper::convert_range_to_wildcards( (int) str_replace( '-', '', $pcode_parts['0'] ), (int) str_replace( '-', '', $pcode_parts['1'] ) ) as $val ) {
+								$pers_ps_array[] = $val;
+							}
+							$pers_ps_array = WC_Amazon_Payments_Advanced_Helper::num_optimizations( $pers_ps_array );
 							$postcode_rules = array_merge( $postcode_rules, WC_Amazon_Payments_Advanced_Helper::maybe_re_add_dashes( WC_Amazon_Payments_Advanced_Helper::maybe_re_add_leading_zeros( $pers_ps_array, $pcode_parts ), $pcode_parts ) );
 						} else {
 							$postcode_rules[] = $postcode;
