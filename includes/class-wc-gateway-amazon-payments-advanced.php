@@ -1621,6 +1621,11 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 				$order->update_status( 'on-hold' );
 				wc_maybe_reduce_stock_levels( $order->get_id() );
 				wc_apa()->ipn_handler->schedule_hook( $charge_id, 'CHARGE' );
+
+				if ( 'Authorized' === $charge_status ) {
+					wc_apa()->get_gateway()->perform_capture( $order );
+				}
+
 				break;
 			case 'Canceled':
 				$order->update_status( 'on-hold' );
