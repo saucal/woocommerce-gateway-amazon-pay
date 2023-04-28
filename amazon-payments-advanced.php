@@ -16,4 +16,5 @@ foreach ( $active_plugins as $key => $active_plugin ) {
 		$active_plugins[ $key ] = str_replace( '/amazon-payments-advanced.php', '/woocommerce-gateway-amazon-payments-advanced.php', $active_plugin );
 	}
 }
+
 update_option( 'active_plugins', $active_plugins );
