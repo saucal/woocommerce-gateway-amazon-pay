@@ -187,6 +187,11 @@ class WC_Amazon_Payments_Advanced {
 		add_action( 'rest_api_init', array( $this, 'rest_api_register_routes' ), 11 );
 		add_filter( 'woocommerce_rest_prepare_shop_order', array( $this, 'rest_api_add_amazon_ref_info' ), 10, 2 );
 
+
+		// require_once $this->includes_path . 'class-wc-amazon-payments-advanced-spc.php';
+
+		// WC_Amazon_Payments_Advanced_SPC::hooks();
+
 		// IPN handler.
 		$this->ipn_handler = new WC_Amazon_Payments_Advanced_IPN_Handler();
 		new WC_Amazon_Payments_Advanced_IPN_Handler_Legacy(); // TODO: Maybe register legacy hooks differently
@@ -500,9 +505,13 @@ class WC_Amazon_Payments_Advanced {
 		}
 
 		require_once $this->includes_path . 'class-wc-amazon-payments-advanced-rest-api-controller.php';
+		require_once $this->includes_path . 'class-wc-amazon-payments-advanced-spc-rest.php';
 
 		$api_implementation = new WC_Amazon_Payments_Advanced_REST_API_Controller();
 		$api_implementation->register_routes();
+
+		$spc_implementation = new WC_Amazon_Payments_Advanced_SPC_Rest();
+		$spc_implementation->register_routes();
 	}
 
 	/**

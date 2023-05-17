@@ -462,6 +462,12 @@ class WC_Amazon_Payments_Advanced_API extends WC_Amazon_Payments_Advanced_API_Ab
 		);
 	}
 
+	public static function get_post_signed_headers( $method, $url, $query_params = '', $payload = array(), $other_headers = array() ) {
+		$client = self::get_client();
+		return $client->getPostSignedHeaders( $method, $url, $query_params, wp_json_encode( $payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ), $other_headers );
+		// return $client->getPostSignedHeaders( $method, $url, $query_params, $payload, $other_headers );
+	}
+
 	/**
 	 * Get classic create checkout session config to send to Amazon.
 	 *
