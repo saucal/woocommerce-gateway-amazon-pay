@@ -51,4 +51,24 @@ class WC_Mocker_Amazon_Payments_Advanced_API {
 			'signature'   => $signature,
 		);
 	}
+
+	public static function is_region_supports_shop_currency( $region, $currency = false ) : bool {
+
+		if ( ! $currency ) {
+			$currency = get_woocommerce_currency();
+		}
+		
+		switch ( $region ) {
+			case 'eu':
+				return 'EUR' === $currency;
+			case 'gb':
+				return 'GBP' === $currency;
+			case 'us':
+				return 'USD' === $currency;
+			case 'jp':
+				return 'JPY' === $currency;
+		}
+
+		return false;
+	}
 }

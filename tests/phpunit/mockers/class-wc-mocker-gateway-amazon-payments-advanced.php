@@ -77,11 +77,21 @@ class WC_Mocker_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payme
 	 *
 	 * @return string
 	 */
-	protected static function get_estimated_order_amount() : string {
+	public static function get_estimated_order_amount() : string {
+		if ( null === WC()->cart ) {
+			return '';
+		}
+
+		$active_currency = get_woocommerce_currency();
+
+		if ( ! WC_Mocker_Amazon_Payments_Advanced_API::is_region_supports_shop_currency( WC_Amazon_Payments_Advanced_API::get_settings('payment_region'), $active_currency ) ) {
+			return '';
+		}
+
 		return wp_json_encode(
 			array(
 				'amount'       => self::$order_total,
-				'currencyCode' => get_woocommerce_currency(),
+				'currencyCode' => $active_currency,
 			)
 		);
 	}
