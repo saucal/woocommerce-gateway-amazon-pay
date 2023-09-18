@@ -3030,10 +3030,16 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			return '';
 		}
 
+		$active_currency = WC_Amazon_Payments_Advanced_Multi_Currency::is_active() ? WC_Amazon_Payments_Advanced_Multi_Currency::get_selected_currency() : get_woocommerce_currency();
+
+		if ( ! WC_Amazon_Payments_Advanced_API::is_region_supports_shop_currency( $active_currency ) ) {
+			return '';
+		}
+
 		return wp_json_encode(
 			array(
 				'amount'       => WC()->cart->get_total( 'amount' ),
-				'currencyCode' => get_woocommerce_currency(),
+				'currencyCode' => $active_currency,
 			)
 		);
 	}
