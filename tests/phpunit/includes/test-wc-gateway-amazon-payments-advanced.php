@@ -148,15 +148,7 @@ class WC_Gateway_Amazon_Payments_Advanced_Test extends WP_UnitTestCase {
 
 		update_option( 'woocommerce_currency', 'USD' );
 
-		$this->assertEquals(
-			wp_json_encode(
-				array(
-					'amount'       => '',
-					'currencyCode' => 'USD',
-				)
-			),
-			$eu_mock_gateway::get_estimated_order_amount()
-		);
+		$this->assertEquals( '', $eu_mock_gateway::get_estimated_order_amount() );
 	}
 
 	/**

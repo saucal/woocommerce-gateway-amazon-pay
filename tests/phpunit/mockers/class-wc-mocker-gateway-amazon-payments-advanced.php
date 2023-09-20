@@ -82,17 +82,15 @@ class WC_Mocker_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payme
 			return '';
 		}
 
-		$total = self::$order_total;
-
 		$active_currency = get_woocommerce_currency();
 
 		if ( ! WC_Mocker_Amazon_Payments_Advanced_API::is_region_supports_shop_currency( $active_currency ) ) {
-			$total = '';
+			return '';
 		}
 
 		return wp_json_encode(
 			array(
-				'amount'       => $total,
+				'amount'       => self::$order_total,
 				'currencyCode' => $active_currency,
 			)
 		);
