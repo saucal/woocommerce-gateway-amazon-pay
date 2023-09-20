@@ -82,15 +82,17 @@ class WC_Mocker_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payme
 			return '';
 		}
 
+		$total = self::$order_total;
+
 		$active_currency = get_woocommerce_currency();
 
-		if ( ! WC_Mocker_Amazon_Payments_Advanced_API::is_region_supports_shop_currency( WC_Amazon_Payments_Advanced_API::get_settings('payment_region'), $active_currency ) ) {
-			return '';
+		if ( ! WC_Mocker_Amazon_Payments_Advanced_API::is_region_supports_shop_currency( $active_currency ) ) {
+			$total = '';
 		}
 
 		return wp_json_encode(
 			array(
-				'amount'       => self::$order_total,
+				'amount'       => $total,
 				'currencyCode' => $active_currency,
 			)
 		);
