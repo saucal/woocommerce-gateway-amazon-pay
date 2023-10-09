@@ -18,12 +18,15 @@ const getButtonSettings = ( buttonSettingsFlag, checkoutConfig, estimatedOrderAm
 		// customize the buyer experience
 		placement: amazon_payments_advanced.placement,
 		buttonColor: amazon_payments_advanced.button_color,
-		estimatedOrderAmount: estimatedOrderAmount,
 		checkoutLanguage:
 			amazon_payments_advanced.button_language !== ''
 				? amazon_payments_advanced.button_language.replace( '-', '_' )
 				: undefined
 	};
+
+	if ( estimatedOrderAmount ) {
+		obj.estimatedOrderAmount = estimatedOrderAmount;
+	}
 
 	if ( 'express' === buttonSettingsFlag ) {
 		obj.productType = amazon_payments_advanced.action;
