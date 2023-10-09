@@ -1,5 +1,11 @@
 *** Amazon Pay Changelog ***
 
+= 2.5.1 - 2023-10-09 =
+
+* Add - Improve multi-currency compatibility support.
+* Fix - Issue with estimatedOrderAmount and multi-currency.
+* Update - Amazon Pay SDK.
+
 = 2.5.0 - 2023-07-20 =
 
 * Add - Plugin review Prompt.
