@@ -7,7 +7,6 @@ import { useEffect, useState } from '@wordpress/element';
  * Internal dependencies
  */
 import { renderAmazonButton } from '../../_renderAmazonButton';
-import { settings } from './_settings';
 
 /**
  * Returns a react component and also sets an observer for the onCheckoutAfterProcessingWithSuccess event.
@@ -24,16 +23,6 @@ const AmazonPayExpressBtn = ( props ) => {
 	return <div id="pay_with_amazon_express" />;
 };
 
-
-/**
- * Is estimated order amount supported.
- * @param {object} currency
- * @returns {boolean} True if estimated order amount is supported.
- */
-const isEstimatedOrderAmountSupported = ( currency ) => {
-	return currency.code && settings.regionBaseCurrencies && settings.regionBaseCurrencies.includes( currency.code );
-};
-
 /**
  * Returns the estimated order amount button attribute.
  * @param {object} props
@@ -42,10 +31,6 @@ const isEstimatedOrderAmountSupported = ( currency ) => {
 const calculateEstimatedOrderAmount = ( props ) => {
 	const { billing } = props;
 	const { currency } = billing;
-
-	if ( ! isEstimatedOrderAmountSupported( currency ) ) {
-		return null;
-	}
 
 	/**
 	 * Get how many charactes are present in the cart's total value.

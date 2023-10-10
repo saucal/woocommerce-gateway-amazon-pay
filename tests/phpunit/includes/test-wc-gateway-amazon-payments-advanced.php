@@ -113,42 +113,15 @@ class WC_Gateway_Amazon_Payments_Advanced_Test extends WP_UnitTestCase {
 				'result'                     => 'success',
 				'redirect'                   => '#amazon-pay-classic-id-that-should-not-exist',
 				'amazonCreateCheckoutParams' => wp_json_encode( WC_Mocker_Amazon_Payments_Advanced_API::get_create_checkout_classic_session_config( array( 'test' ) ) ),
-				'amazonEstimatedOrderAmount' => $mock_gateway::get_estimated_order_amount(),
+				'amazonEstimatedOrderAmount' => wp_json_encode(
+					array(
+						'amount'       => $order_total,
+						'currencyCode' => get_woocommerce_currency(),
+					)
+				),
 			),
 			$mock_gateway->process_payment( $order->get_id() )
 		);
-	}
-
-	/**
-	 * Test estimated order amount with multi-currency.
-	 *
-	 * @return void
-	 */
-	public function test_estimated_order_amount_output() : void {
-		$checkout_session_key = apply_filters( 'woocommerce_amazon_pa_checkout_session_key', 'amazon_checkout_session_id' );
-		WC()->session->set( $checkout_session_key, null );
-		WC()->session->save_data();
-
-		$order_total = 100;
-
-		update_option( 'woocommerce_default_country', 'ES:B' );
-		update_option( 'woocommerce_currency', 'EUR' );
-
-		$eu_mock_gateway = new WC_Mocker_Gateway_Amazon_Payments_Advanced( $order_total );
-
-		$this->assertEquals(
-			wp_json_encode(
-				array(
-					'amount'       => $order_total,
-					'currencyCode' => 'EUR',
-				)
-			),
-			$eu_mock_gateway::get_estimated_order_amount(),
-		);
-
-		update_option( 'woocommerce_currency', 'USD' );
-
-		$this->assertEquals( '', $eu_mock_gateway::get_estimated_order_amount() );
 	}
 
 	/**

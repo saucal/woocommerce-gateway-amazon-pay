@@ -118,31 +118,4 @@ abstract class WC_Amazon_Payments_Advanced_Block_Compat_Abstract extends Abstrac
 
 		return array_values( WC_Amazon_Payments_Advanced_API::get_selected_currencies() );
 	}
-
-	/**
-	 * Get base currency per region.
-	 *
-	 * @param string $region The current region.
-	 *
-	 * @return array
-	 */
-	protected function region_base_currencies( $region = '' ) {
-
-		if ( empty( $region ) ) {
-			$region = WC_Amazon_Payments_Advanced_API::get_region();
-		}
-
-		switch ( $region ) {
-			case 'eu':
-				return array( 'EUR' );
-			case 'gb':
-				return array( 'GBP' );
-			case 'us':
-				return array( 'USD' );
-			case 'jp':
-				return array( 'JPY' );
-			default:
-				return array();
-		}
-	}
 }
