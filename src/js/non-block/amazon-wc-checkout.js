@@ -116,6 +116,11 @@
 					$.each( singleAddToCart.closest( 'form.cart' ).serializeArray(), function( index, object ) {
 						if ( 'add-to-cart' === object.name ) {
 							data.product_id = object.value;
+						} else if ( 'undefined' !== typeof data[ object.name ] ) {
+							if ( ! $.isArray( data[ object.name ] ) ) {
+								data[ object.name ] = [ data[ object.name ] ];
+							}
+							data[ object.name ].push( object.value );
 						} else {
 							data[ object.name ] = object.value;
 						}
@@ -128,7 +133,7 @@
 					$.ajax(
 						{
 							url: amazon_payments_advanced.ajax_url,
-							type: 'get',
+							type: 'post',
 							data: $.param( data ),
 							success: function( result ) {
 								if ( result.data.create_checkout_session_config ) {
