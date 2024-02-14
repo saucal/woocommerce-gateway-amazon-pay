@@ -280,7 +280,9 @@
 				}
 			} else {
 				obj.createCheckoutSessionConfig = amazon_payments_advanced.create_checkout_session_config;
-				obj.estimatedOrderAmount = amazon_payments_advanced.estimated_order_amount;
+				if ( amazon_payments_advanced.estimated_order_amount ) {
+					obj.estimatedOrderAmount = amazon_payments_advanced.estimated_order_amount;
+				}
 			}
 			return obj;
 		}
