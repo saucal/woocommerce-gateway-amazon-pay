@@ -1,7 +1,7 @@
 {
   "name": "woocommerce-gateway-amazon-payments-advanced",
   "description": "Amazon Pay Gateway for WooCommerce",
-  "version": "2.5.2-rc2",
+  "version": "2.5.2-rc3",
   "title": "WooCommerce Gateway Amazon Pay",
   "repository": {
     "type": "git",
