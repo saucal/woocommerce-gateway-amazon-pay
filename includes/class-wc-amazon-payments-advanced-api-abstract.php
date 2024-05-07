@@ -390,7 +390,7 @@ abstract class WC_Amazon_Payments_Advanced_API_Abstract {
 			);
 		}
 		// Use fallback value for the last name to avoid field required errors.
-		$last_name_fallback = '.';
+		$last_name_fallback = '-';
 		$names              = explode( ' ', $name );
 		return array(
 			'first_name' => array_shift( $names ),
@@ -495,6 +495,8 @@ abstract class WC_Amazon_Payments_Advanced_API_Abstract {
 			if ( ! empty( $valid_states ) && is_array( $valid_states ) ) {
 				$valid_state_values = array_map( 'wc_strtoupper', array_flip( array_map( 'wc_strtoupper', $valid_states ) ) );
 				$uc_state       = wc_strtoupper( $formatted['state'] );
+
+				$uc_state = WC_Gateway_Amazon_Payments_Advanced::maybe_get_jp_region_code( $uc_state );
 
 				if ( isset( $valid_state_values[ $uc_state ] ) ) {
 					// With this part we consider state value to be valid as well, convert it to the state key for the valid_states check below.
