@@ -140,7 +140,6 @@ abstract class WC_Amazon_Payments_Advanced_API_Abstract {
 			'button_size'                     => 'small',
 			'button_color'                    => 'Gold',
 			'button_language'                 => '',
-			'hide_standard_checkout_button'   => 'no',
 			'debug'                           => 'no',
 			'hide_button_mode'                => 'no',
 			'amazon_keys_setup_and_validated' => '0',
@@ -391,7 +390,7 @@ abstract class WC_Amazon_Payments_Advanced_API_Abstract {
 			);
 		}
 		// Use fallback value for the last name to avoid field required errors.
-		$last_name_fallback = '.';
+		$last_name_fallback = '-';
 		$names              = explode( ' ', $name );
 		return array(
 			'first_name' => array_shift( $names ),
@@ -497,6 +496,8 @@ abstract class WC_Amazon_Payments_Advanced_API_Abstract {
 				$valid_state_values = array_map( 'wc_strtoupper', array_flip( array_map( 'wc_strtoupper', $valid_states ) ) );
 				$uc_state       = wc_strtoupper( $formatted['state'] );
 
+				$uc_state = WC_Gateway_Amazon_Payments_Advanced::maybe_get_jp_region_code( $uc_state );
+
 				if ( isset( $valid_state_values[ $uc_state ] ) ) {
 					// With this part we consider state value to be valid as well, convert it to the state key for the valid_states check below.
 					$uc_state = $valid_state_values[ $uc_state ];
@@ -520,6 +521,25 @@ abstract class WC_Amazon_Payments_Advanced_API_Abstract {
 
 		return $formatted;
 
+	}
+
+	/**
+	 * Format the charge amount, make sure that decimals with JPY is 0.
+	 *
+	 * @param array $charge_amount The charge amount.
+	 */
+	public static function format_charge_amount( $charge_amount ) {
+
+		if ( empty( $charge_amount['currencyCode'] ) || empty( $charge_amount['amount'] ) ) {
+			return $charge_amount;
+		}
+
+		switch ( $charge_amount['currencyCode'] ) {
+			case 'JPY':
+				$charge_amount['amount'] = WC_Amazon_Payments_Advanced::format_amount( $charge_amount['amount'], 0 );
+		}
+
+		return $charge_amount;
 	}
 
 	/**
