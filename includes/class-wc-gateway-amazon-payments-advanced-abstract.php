@@ -943,7 +943,7 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 			return;
 		}
 
-		$button_placeholder = '<' . $elem . ' id="' . esc_attr( $id ) . '"></' . $elem . '>';
+		$button_placeholder = '<button class="amazon-pay-handler" data-button-id="' . esc_attr( $id ) . '">Amazon Pay</button><' . $elem . ' id="' . esc_attr( $id ) . '" style="display:none!important;"></' . $elem . '>';
 
 		if ( false === $echo ) {
 			return $button_placeholder;

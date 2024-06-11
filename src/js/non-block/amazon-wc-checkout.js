@@ -7,6 +7,15 @@
 		var amazonCreateCheckoutConfig = null;
 		var amazonEstimatedOrderAmount = null;
 
+		$( '.amazon-pay-handler' ).on( 'click', function( e ) {
+			e.preventDefault();
+			const button = $( `#${$( this ).data( 'button-id' )}` );
+
+			if ( button ) {
+				button.trigger( 'click' );
+			}
+		} );
+
 		/* Handles 'classic' payment method on checkout. */
 		$( 'form.checkout' ).on( 'checkout_place_order_success', function( e, result ) {
 			if ( 'undefined' !== typeof result.amazonCreateCheckoutParams && $( classicButtonId ).length > 0 ) {
@@ -204,7 +213,8 @@
 			$( buttonId ).each( function() {
 				var thisButton = $( this );
 				var thisId = thisButton.attr( 'id' );
-				if ( button_id === '#' + thisId && ! thisButton.is( ':visible' ) ) {
+				var handler = $( `.amazon-pay-handler[data-button-id="${thisId}"]` );
+				if ( button_id === '#' + thisId && handler && ! handler.is( ':visible' ) ) {
 					return;
 				}
 				if ( typeof thisId === 'undefined' ) {
