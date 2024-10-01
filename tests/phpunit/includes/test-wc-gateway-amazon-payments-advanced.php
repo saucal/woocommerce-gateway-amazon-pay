@@ -231,7 +231,7 @@ class WC_Gateway_Amazon_Payments_Advanced_Test extends WP_UnitTestCase {
 	 * @param array $extras Extra settings to update the gateway with.
 	 * @return void
 	 */
-	protected function make_gateway_available( array $extras = array() ) {
+	protected function make_gateway_available( $extras = array() ) {
 		$settings = WC_Amazon_Payments_Advanced_API::get_settings();
 		$settings = array_merge(
 			$settings,
