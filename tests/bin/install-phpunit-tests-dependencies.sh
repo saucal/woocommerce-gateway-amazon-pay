@@ -66,7 +66,7 @@ install_woocommerce() {
 
 	echo "Installing WooCommerce $WC_VERSION"
 	cd -
-	download https://downloads.wordpress.org/plugin/woocommerce.9.0.0.zip ../woocommerce.zip
+	download https://downloads.wordpress.org/plugin/woocommerce.8.9.3.zip ../woocommerce.zip
 	unzip -o -qq ../woocommerce.zip -d ../
 	rm -rf ../woocommerce.zip
 }
