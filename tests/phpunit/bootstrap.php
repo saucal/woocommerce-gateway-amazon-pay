@@ -30,20 +30,20 @@ require_once $_tests_dir . '/includes/functions.php';
 function _manually_load_plugin() {
 	$_plugin_dir = dirname( __FILE__ ) . '/../../';
 
-	//require_once $_plugin_dir . '../woocommerce/woocommerce.php';
+	require_once $_plugin_dir . '../woocommerce/woocommerce.php';
 
-	//require_once $_plugin_dir . 'woocommerce-gateway-amazon-payments-advanced.php';
-	//require_once $_plugin_dir . 'includes/class-wc-gateway-amazon-payments-advanced-abstract.php';
-	//require_once $_plugin_dir . 'includes/class-wc-gateway-amazon-payments-advanced.php';
+	require_once $_plugin_dir . 'woocommerce-gateway-amazon-payments-advanced.php';
+	require_once $_plugin_dir . 'includes/class-wc-gateway-amazon-payments-advanced-abstract.php';
+	require_once $_plugin_dir . 'includes/class-wc-gateway-amazon-payments-advanced.php';
 
 	// Require Test Helpers.
-	//require_once __DIR__ . '/helpers/class-wc-helper-order.php';
-	//require_once __DIR__ . '/helpers/class-wc-helper-product.php';
-	//require_once __DIR__ . '/helpers/class-wc-helper-shipping.php';
+	require_once __DIR__ . '/helpers/class-wc-helper-order.php';
+	require_once __DIR__ . '/helpers/class-wc-helper-product.php';
+	require_once __DIR__ . '/helpers/class-wc-helper-shipping.php';
 
 	// Require Mockers.
-	//require_once __DIR__ . '/mockers/class-wc-mocker-gateway-amazon-payments-advanced.php';
-	//require_once __DIR__ . '/mockers/class-wc-mocker-amazon-payments-advanced-api.php';
+	require_once __DIR__ . '/mockers/class-wc-mocker-gateway-amazon-payments-advanced.php';
+	require_once __DIR__ . '/mockers/class-wc-mocker-amazon-payments-advanced-api.php';
 }
 
 tests_add_filter( 'muplugins_loaded', '_manually_load_plugin' );
