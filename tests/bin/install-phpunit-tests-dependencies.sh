@@ -67,7 +67,7 @@ install_woocommerce() {
 		WC_VERSION="8.4.0"
 	else	
 		WC_VERSION=$(curl https://api.wordpress.org/plugins/info/1.0/woocommerce.json | jq -r '.version')
-	if
+	fi
 
 	echo "Installing WooCommerce $WC_VERSION"
 	cd -
