@@ -29,7 +29,7 @@
   },
   "scripts": {
     "postinstall": "composer install",
-    "test:php": "./vendor/bin/phpunit",
+    "test:php": "./vendor/bin/phpunit --verbose",
     "lint:php": "composer phpcs",
     "fix:php": "composer phpcbf",
     "lint:js": "cross-var wp-scripts lint-js $npm_package_config_webpack_js",
@@ -61,6 +61,7 @@
     "webpack-remove-empty-scripts": "^1.0.3"
   },
   "dependencies": {
-    "@wordpress/i18n": "^4.33.0"
+    "@wordpress/i18n": "^4.33.0",
+    "url": "^0.11.4"
   }
 }
