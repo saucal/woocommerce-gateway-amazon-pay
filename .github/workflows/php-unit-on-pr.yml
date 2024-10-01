@@ -76,7 +76,7 @@ jobs:
       # Prepare test environment
       - name: Prepare test environment
         run: |
-          bash tests/bin/install-phpunit-tests-dependencies.sh wc_apa_test root root 127.0.0.1 latest
+          bash tests/bin/install-phpunit-tests-dependencies.sh wc_apa_test root root 127.0.0.1 latest ${{ matrix.php }}
 
       # Run tests
       - name: Run tests
