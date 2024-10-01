@@ -63,13 +63,13 @@ install_wp() {
 }
 
 install_woocommerce() {
-	if [ $PHP_VERSION == '7.3']; then
+	if [ $PHP_VERSION == 7.3]; then
 		WC_VERSION="8.4.0"
 	else	
 		WC_VERSION=$(curl https://api.wordpress.org/plugins/info/1.0/woocommerce.json | jq -r '.version')
 	fi
 
-	echo "Installing WooCommerce $WC_VERSION"
+	echo "Installing WooCommerce $WC_VERSION on PHP $PHP_VERSION"
 	cd -
 	download https://downloads.wordpress.org/plugin/woocommerce.$WC_VERSION.zip ../woocommerce.zip
 	unzip -o -qq ../woocommerce.zip -d ../
