@@ -214,7 +214,7 @@ class WC_Helper_Product {
 	 * @param string[] $terms    Terms to create for the attribute.
 	 * @return array
 	 */
-	public static function create_attribute( $raw_name = 'size', $terms = array( 'small' ) ) : array {
+	public static function create_attribute( string $raw_name = 'size', array $terms = array( 'small' ) ) : array {
 		global $wpdb, $wc_product_attributes;
 
 		// Make sure caches are clean.
