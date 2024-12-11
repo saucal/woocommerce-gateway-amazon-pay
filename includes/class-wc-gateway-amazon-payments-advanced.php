@@ -720,12 +720,22 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			'billing_postcode',
 			'billing_phone',
 		);
+		// Show fields if empty.
+		$show_if_empty_fields = array(
+			'billing_phone',
+		);
+
+		$session_wc_format = $this->get_woocommerce_data();
+		foreach ( $optional_fields as $index => $key ) {
+			if ( in_array( $key, $show_if_empty_fields, true ) && empty( $session_wc_format[ $key ] ) ) {
+				unset( $optional_fields[ $index ] );
+			}
+		}
+
 		$all_fields      = array_merge( $required_fields, $optional_fields );
 		$checkout_fields = version_compare( WC_VERSION, '3.0', '>=' )
 			? $checkout->get_checkout_fields()
 			: $checkout->checkout_fields;
-
-		$session_wc_format = $this->get_woocommerce_data();
 
 		$missing  = array();
 		$present  = array();
