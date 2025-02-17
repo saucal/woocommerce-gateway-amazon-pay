@@ -343,6 +343,10 @@ class WC_Gateway_Amazon_Payments_Advanced_Legacy extends WC_Gateway_Amazon_Payme
 				$this->set_order_reference_details( $order, $amazon_reference_id );
 			}
 
+			if ( 'Canceled' === $state ) {
+				throw new Exception( __( 'The order has been cancelled.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+			}
+
 			// Check if we are under SCA.
 			$is_sca = WC_Amazon_Payments_Advanced_API_Legacy::is_sca_region();
 			// Confirm order reference.
