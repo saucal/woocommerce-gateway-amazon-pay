@@ -193,6 +193,8 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 
 		add_action( 'woocommerce_amazon_checkout_init', array( $this, 'checkout_init_common' ) );
 
+		add_action( 'woocommerce_shipping_zone_before_methods_table', array( $this, 'postcode_explanation_message' ) );
+
 	}
 
 	/**
@@ -1089,6 +1091,60 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Displays an explanation/warning in order to make it clear how Amazon Pay
+	 * treats postcode restrictions.
+	 *
+	 * @param WC_Shipping_Zone $zone The shipping zone.
+	 * @return void
+	 */
+	public function postcode_explanation_message( $zone ) {
+		$pcodes = false;
+
+		foreach ( $zone->get_zone_locations() as $location ) {
+			if ( 'postcode' === $location->type ) {
+				$pcodes = true;
+				break;
+			}
+		}
+
+		if ( $pcodes ) :
+			?>
+			<div class="notice notice-warning">
+				<p>
+					<strong><?php esc_html_e( 'Amazon Pay Notice:', 'woocommerce-gateway-amazon-payments-advanced' ); ?></strong> 
+					<?php
+					/* translators: 1) Opening strong tag. 2) Closing strong tag. */
+					printf( esc_html__( 'When using postcodes to restrict shipping locations, a selected zone is required for them to apply and they will apply to %1$sall%2$s the selected zones. So please, restrict accordingly.', 'woocommerce-gateway-amazon-payments-advanced' ), '<strong>', '</strong>' );
+					?>
+				</p>
+				<p>
+					<?php
+					/* translators: 1) Opening strong tag. 2) Closing strong tag. */
+					printf( esc_html__( 'Additionally, be careful when specifying ranges. By default WooCommerce supports only %1$sfully numeric ranges%2$s. The same applies for Amazon Pay.', 'woocommerce-gateway-amazon-payments-advanced' ), '<strong>', '</strong>' );
+					?>
+				</p>
+				<p>
+					<?php
+					esc_html_e(
+						'Prefer using the asterisk(*) wildcard whenever possible. Amazon API does not support postcode ranges, so we convert the specified ranges using a wildcard(?) supported by Amazon API. The range 1...1000 would be sent to Amazon as ( "?", "??", "???", 1000 ) for example.',
+						'woocommerce-gateway-amazon-payments-advanced'
+					);
+					?>
+				</p>
+				<p>
+					<?php
+					esc_html_e(
+						'We also support postcode ranges including a dash(-). The only restriction, for the time being at least, is that the dash needs to be in the same position in the minimum and maximum values of the range. So we would support a range like this 1234-000...9999-999, but we wouldn\'t this one 1-000...9999-999.',
+						'woocommerce-gateway-amazon-payments-advanced'
+					);
+					?>
+				</p>
+			</div>
+			<?php
+		endif;
 	}
 
 	/**

@@ -173,6 +173,8 @@ class WC_Amazon_Payments_Advanced {
 		include_once $this->includes_path . 'class-wc-amazon-payments-advanced-ipn-handler.php';
 		include_once $this->includes_path . 'legacy/class-wc-amazon-payments-advanced-ipn-handler-legacy.php';
 
+		include_once $this->includes_path . 'class-wc-amazon-payments-advanced-helper.php';
+
 		// On install hook.
 		include_once $this->includes_path . 'class-wc-amazon-payments-advanced-install.php';
 		register_activation_hook( __FILE__, array( 'WC_Amazon_Payments_Advanced_Install', 'install' ) );
