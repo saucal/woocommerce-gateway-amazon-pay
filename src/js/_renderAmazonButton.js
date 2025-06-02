@@ -94,9 +94,13 @@ export const activateChange = ( button_id, action ) => {
 		e.preventDefault();
 	} );
 
-
 	amazon.Pay.bindChangeAction( '#' + button.getAttribute( 'id' ), {
 		amazonCheckoutSessionId: amazon_payments_advanced.checkout_session_id,
 		changeAction: action
 	} );
+
+	const editAddressButton = document.querySelector( 'a.wc-block-components-address-card__edit' );
+	if ( editAddressButton && amazon_payments_advanced.checkout_session_id ) {
+		editAddressButton.remove();
+	}	
 };
