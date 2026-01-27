@@ -26,6 +26,9 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 	const KEYS_OPTION_PRIVATE_KEY       = 'woocommerce_amazon_payments_advanced_private_key';
 	const KEYS_OPTION_TEMP_PRIVATE_KEYS = 'woocommerce_amazon_payments_advanced_temp_private_keys';
 
+	const TEMP_KEYS_MAX = 8;
+	const TEMP_KEYS_TTL = 86400; // 24 hours.
+
 	/**
 	 * Constructor.
 	 */
@@ -176,11 +179,80 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 	 * @return array
 	 */
 	protected function get_temp_private_keys() {
-		$temps = get_option( self::KEYS_OPTION_TEMP_PRIVATE_KEYS, array() );
-		if ( ! is_array( $temps ) ) {
-			$temps = array();
+		$stored = get_option( self::KEYS_OPTION_TEMP_PRIVATE_KEYS, array() );
+		if ( ! is_array( $stored ) ) {
+			$stored = array();
 		}
-		return $temps;
+
+		$now    = time();
+		$pruned = array();
+
+		foreach ( $stored as $item ) {
+			if ( ! is_array( $item ) || empty( $item['key'] ) || empty( $item['ts'] ) ) {
+				continue;
+			}
+
+			$ts = (int) $item['ts'];
+			if ( $ts <= 0 ) {
+				continue;
+			}
+
+			if ( ( $now - $ts ) > self::TEMP_KEYS_TTL ) {
+				continue;
+			}
+
+			$pruned[] = array(
+				'key' => (string) $item['key'],
+				'ts'  => $ts,
+			);
+		}
+
+		// Sort newest first.
+		usort(
+			$pruned,
+			static function ( $a, $b ) {
+				return (int) $b['ts'] <=> (int) $a['ts'];
+			}
+		);
+
+		// Cap size.
+		$pruned = array_slice( $pruned, 0, self::TEMP_KEYS_MAX );
+
+		// Persist if changed (and keep autoload off).
+		update_option( self::KEYS_OPTION_TEMP_PRIVATE_KEYS, $pruned, 'no' );
+
+		// Return only key strings, newest first.
+		return array_values(
+			array_map(
+				static function ( $item ) {
+					return $item['key'];
+				},
+				$pruned
+			)
+		);
+	}
+
+	/**
+	 * Store a new temp private key, bounded.
+	 *
+	 * @param string $private_key Private key.
+	 * @return void
+	 */
+	protected function push_temp_private_key( $private_key ) {
+		$stored = get_option( self::KEYS_OPTION_TEMP_PRIVATE_KEYS, array() );
+		if ( ! is_array( $stored ) ) {
+			$stored = array();
+		}
+
+		$stored[] = array(
+			'key' => (string) $private_key,
+			'ts'  => time(),
+		);
+
+		update_option( self::KEYS_OPTION_TEMP_PRIVATE_KEYS, $stored, 'no' );
+
+		// Normalize immediately so it never grows.
+		$this->get_temp_private_keys();
 	}
 
 	/**
@@ -210,11 +282,8 @@ class WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler {
 		$public_key = openssl_pkey_get_details( $keys );
 		openssl_pkey_export( $keys, $private_key );
 
-		$temps = $this->get_temp_private_keys();
-
-		$temps[] = $private_key;
-		update_option( self::KEYS_OPTION_TEMP_PRIVATE_KEYS, $temps );
-
+		$this->push_temp_private_key( $private_key );
+		
 		return ( $public ) ? $public_key['key'] : $private_key;
 	}
 
