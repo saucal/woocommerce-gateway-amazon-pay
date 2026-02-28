@@ -51,7 +51,7 @@ class WC_Amazon_Payments_Advanced_Multi_Currency {
 		// Load multicurrency fields if compatibility. (Only on settings admin).
 		if ( is_admin() ) {
 			// phpcs:ignore WordPress.Security.NonceVerification
-			$compatible_region = isset( $_POST['woocommerce_amazon_payments_advanced_payment_region'] ) ? self::compatible_region( sanitize_text_field( $_POST['woocommerce_amazon_payments_advanced_payment_region'] ) ) : self::compatible_region();
+			$compatible_region = isset( $_POST['woocommerce_amazon_payments_advanced_payment_region'] ) ? self::compatible_region( sanitize_text_field( wp_unslash( $_POST['woocommerce_amazon_payments_advanced_payment_region'] ) ) ) : self::compatible_region();
 			if ( $compatible_region ) {
 				add_filter( 'woocommerce_amazon_pa_form_fields_before_legacy', array( __CLASS__, 'add_currency_fields' ) );
 			}

@@ -62,8 +62,8 @@ class WC_Gateway_Amazon_Payments_Advanced_Subscriptions_Legacy {
 			return $process;
 		}
 
-		$amazon_reference_id              = isset( $_POST['amazon_reference_id'] ) ? wc_clean( $_POST['amazon_reference_id'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$amazon_billing_agreement_id      = isset( $_POST['amazon_billing_agreement_id'] ) ? wc_clean( $_POST['amazon_billing_agreement_id'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$amazon_reference_id              = isset( $_POST['amazon_reference_id'] ) ? wc_clean( wp_unslash( $_POST['amazon_reference_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$amazon_billing_agreement_id      = isset( $_POST['amazon_billing_agreement_id'] ) ? wc_clean( wp_unslash( $_POST['amazon_billing_agreement_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$amazon_billing_agreement_details = WC()->session->get( 'amazon_billing_agreement_details' ) ? wc_clean( WC()->session->get( 'amazon_billing_agreement_details' ) ) : false;
 
 		if ( ! $amazon_billing_agreement_id && 'yes' === get_option( 'woocommerce_subscriptions_turn_off_automatic_payments' ) ) {
@@ -383,9 +383,9 @@ class WC_Gateway_Amazon_Payments_Advanced_Subscriptions_Legacy {
 			return new WP_Error(
 				'billing_agreemment_details_failed',
 				is_object( $response ) && ! empty( $response->Error ) && is_object( $response->Error->Message ) && ! empty( $response->Error->Message ) ?
-				$response->Error->Message :
+				esc_html( (string) $response->Error->Message ) :
 				/* Translators: The billing agreement id. */
-				sprintf( __( 'Amazon API responded with an unexpected error when requesting for "GetBillingAgreementDetails" of billing agreement with ID %s', 'woocommerce-gateway-amazon-payments-advanced' ), $amazon_billing_agreement_id )
+				sprintf( __( 'Amazon API responded with an unexpected error when requesting for "GetBillingAgreementDetails" of billing agreement with ID %s', 'woocommerce-gateway-amazon-payments-advanced' ), esc_html( $amazon_billing_agreement_id ) )
 			);
 			//phpcs:enable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		}
@@ -436,7 +436,7 @@ class WC_Gateway_Amazon_Payments_Advanced_Subscriptions_Legacy {
 
 			wc_apa()->log( "Error: WP_Error '{$error_message}' for order {$order_id} with billing agreement: {$amazon_billing_agreement_id}.", null, $context );
 
-			throw new Exception( $error_message );
+			throw new Exception( esc_html( $error_message ) );
 
 		}
 
@@ -445,7 +445,7 @@ class WC_Gateway_Amazon_Payments_Advanced_Subscriptions_Legacy {
 			$error_message = (string) $response->Error->Message;
 			wc_apa()->log( "Error: API Error '{$error_message}' for order {$order_id} with billing agreement: {$amazon_billing_agreement_id}.", null, $context );
 
-			throw new Exception( $error_message );
+			throw new Exception( esc_html( $error_message ) );
 		}
 		// @codingStandardsIgnoreEnd
 	}

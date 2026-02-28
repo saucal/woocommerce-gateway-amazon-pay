@@ -83,8 +83,15 @@ class WC_Amazon_Payments_Advanced_Order_Admin_Legacy {
 				// $id is capture reference.
 				wc_apa()->log( 'Info: Trying to refund payment with capture reference ' . $id );
 				// phpcs:disable WordPress.Security.NonceVerification.Missing
-				$amazon_refund_amount = floatval( wc_clean( $_POST['amazon_refund_amount'] ) );
-				$amazon_refund_note   = wc_clean( $_POST['amazon_refund_note'] );
+				$amazon_refund_amount = 0;
+				if ( isset( $_POST['amazon_refund_amount'] ) ) {
+					$amazon_refund_amount = floatval( sanitize_text_field( wp_unslash( $_POST['amazon_refund_amount'] ) ) );
+				}
+
+				$amazon_refund_note = '';
+				if ( isset( $_POST['amazon_refund_note'] ) ) {
+					$amazon_refund_note = sanitize_text_field( wp_unslash( $_POST['amazon_refund_note'] ) );
+				}
 				// phpcs:enable WordPress.Security.nonceVerification.Missing
 				WC_Amazon_Payments_Advanced_API_Legacy::refund_payment( $order_id, $id, $amazon_refund_amount, $amazon_refund_note );
 				wc_create_refund(

@@ -40,7 +40,7 @@ abstract class WC_Amazon_Payments_Advanced_IPN_Handler_Abstract {
 					$key = $key[0];
 				}
 
-				throw new Exception( $key . ' is required to verify the SNS message.' );
+				throw new Exception( esc_html( $key ) . ' is required to verify the SNS message.' );
 			}
 		}
 	}
