@@ -27,11 +27,11 @@ class WC_Amazon_Payments_Advanced_Order_Admin {
 	public function order_actions() {
 		check_ajax_referer( 'amazon_order_action', 'security' );
 
-		$order_id = absint( $_POST['order_id'] );
+		$order_id = isset( $_POST['order_id'] ) ? absint( wp_unslash( $_POST['order_id'] ) ) : 0;
 		$order    = wc_get_order( $order_id );
 		$version  = WC_Amazon_Payments_Advanced::get_order_version( $order_id );
-		$id       = isset( $_POST['amazon_id'] ) ? wc_clean( $_POST['amazon_id'] ) : '';
-		$action   = sanitize_title( $_POST['amazon_action'] );
+		$id       = isset( $_POST['amazon_id'] ) ? sanitize_text_field( wp_unslash( $_POST['amazon_id'] ) ) : '';
+		$action   = isset( $_POST['amazon_action'] ) ? sanitize_title( wp_unslash( $_POST['amazon_action'] ) ) : '';
 
 		do_action( 'wc_amazon_do_order_action', $order, $id, $action, $version );
 
@@ -77,8 +77,8 @@ class WC_Amazon_Payments_Advanced_Order_Admin {
 
 		$version = WC_Amazon_Payments_Advanced::get_order_version( $order_id );
 
-		$id     = isset( $_GET['amazon_id'] ) ? wc_clean( $_GET['amazon_id'] ) : '';
-		$action = sanitize_title( $_GET['amazon_action'] );
+		$id     = isset( $_GET['amazon_id'] ) ? sanitize_text_field( wp_unslash( $_GET['amazon_id'] ) ) : '';
+		$action = sanitize_title( wp_unslash( $_GET['amazon_action'] ) );
 
 		do_action( 'wc_amazon_do_order_action', $order, $id, $action, $version );
 

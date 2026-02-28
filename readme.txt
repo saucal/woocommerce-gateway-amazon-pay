@@ -1,6 +1,6 @@
 === Amazon Pay for WooCommerce ===
 Contributors: amazonpay, woocommerce, automattic, saucal, woothemes, akeda, jeffstieler, mikejolley, bor0, claudiosanches, royho, jamesrrodger, laurendavissmith001, dwainm, danreylop
-Tags: woocommerce, amazon, checkout, payments, e-commerce, ecommerce
+Tags: woocommerce, amazon, checkout, payments, ecommerce
 Requires at least: 5.5
 Tested up to: 6.9
 Stable tag: 2.6.0

@@ -437,9 +437,23 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		global $wpdb;
 		$this->maybe_create_index_table();
 
+		$cache_key = 'customer_id_for_buyer_' . $buyer_id;
+		$cached_customer_id = wp_cache_get( $cache_key, 'woocommerce_amazon_buyer_index' );
+
+		if ( false !== $cached_customer_id ) {
+			return intval( $cached_customer_id );
+		}
+
+		// This is a custom table, so we need to use a direct database query.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$customer_id = $wpdb->get_var( $wpdb->prepare( "SELECT customer_id FROM {$wpdb->prefix}woocommerce_amazon_buyer_index WHERE buyer_id = %s", $buyer_id ) );
 
-		return ! empty( $customer_id ) ? intval( $customer_id ) : false;
+		if ( ! empty( $customer_id ) ) {
+			wp_cache_set( $cache_key, $customer_id, 'woocommerce_amazon_buyer_index' );
+			return intval( $customer_id );
+		}
+
+		return false;
 	}
 
 	/**
@@ -453,6 +467,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		global $wpdb;
 		$this->maybe_create_index_table();
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$inserted = $wpdb->insert(
 			"{$wpdb->prefix}woocommerce_amazon_buyer_index",
 			array(
@@ -464,6 +479,10 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		if ( ! $inserted ) {
 			return false;
 		}
+
+		// Invalidate cache for this buyer_id.
+		$cache_key = 'customer_id_for_buyer_' . $buyer_id;
+		wp_cache_delete( $cache_key, 'woocommerce_amazon_buyer_index' );
 
 		return true;
 	}
@@ -521,13 +540,13 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 				}
 
 				if ( empty( $data['amazon_validate'] ) ) {
-					throw new Exception( __( 'You did not enter the password to validate your account. If you want, you can continue as guest.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+					throw new Exception( esc_html__( 'You did not enter the password to validate your account. If you want, you can continue as guest.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 				}
 
 				$user = get_user_by( 'id', $user_id );
 
 				if ( ! wp_check_password( $data['amazon_validate'], $user->user_pass, $user->ID ) ) {
-					throw new Exception( __( 'The password you entered did not match the one on the account. Try again, or continue as guest.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+					throw new Exception( esc_html__( 'The password you entered did not match the one on the account. Try again, or continue as guest.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 				}
 
 				$customer_id = $user_id;
@@ -576,7 +595,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 	 */
 	public function print_validate_button( $html ) {
 		$html  = '<p class="form-row" id="amazon_validate_notice_field" data-priority="">';
-		$html .= __( 'An account with your Amazon Pay email address exists already. Is that you? If so, enter your password below.', 'woocommerce-gateway-amazon-payments-advanced' );
+		$html .= esc_html__( 'An account with your Amazon Pay email address exists already. Is that you? If so, enter your password below.', 'woocommerce-gateway-amazon-payments-advanced' );
 		$html .= '</p>';
 		return $html;
 	}
@@ -674,7 +693,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		if ( $this->is_available() ) {
 			if ( ! $this->is_logged_in() ) {
 				?>
-				<div class="woocommerce-info info wc-amazon-payments-advanced-info"><?php echo wp_kses_post( $this->checkout_button( false ) . ' ' . apply_filters( 'woocommerce_amazon_pa_checkout_message', __( 'Have an Amazon account?', 'woocommerce-gateway-amazon-payments-advanced' ) ) ); ?></div>
+				<div class="woocommerce-info info wc-amazon-payments-advanced-info"><?php echo wp_kses_post( $this->checkout_button( false ) . ' ' . apply_filters( 'woocommerce_amazon_pa_checkout_message', esc_html__( 'Have an Amazon account?', 'woocommerce-gateway-amazon-payments-advanced' ) ) ); ?></div>
 				<?php
 			} else {
 				$this->logout_checkout_message();
@@ -691,7 +710,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 	 */
 	public function logout_checkout_message() {
 		$logout_url      = $this->get_amazon_logout_url();
-		$logout_msg_html = '<div class="woocommerce-info info">' . apply_filters( 'woocommerce_amazon_pa_checkout_logout_message', __( 'You\'re logged in with your Amazon Account.', 'woocommerce-gateway-amazon-payments-advanced' ) ) . ' <a href="' . esc_url( $logout_url ) . '" id="amazon-logout">' . __( 'Log out &raquo;', 'woocommerce-gateway-amazon-payments-advanced' ) . '</a></div>';
+		$logout_msg_html = '<div class="woocommerce-info info">' . apply_filters( 'woocommerce_amazon_pa_checkout_logout_message', esc_html__( 'You\'re logged in with your Amazon Account.', 'woocommerce-gateway-amazon-payments-advanced' ) ) . ' <a href="' . esc_url( $logout_url ) . '" id="amazon-logout">' . esc_html__( 'Log out &raquo;', 'woocommerce-gateway-amazon-payments-advanced' ) . '</a></div>';
 		echo wp_kses_post( apply_filters( 'woocommerce_amazon_payments_logout_checkout_message_html', $logout_msg_html ) );
 	}
 
@@ -764,7 +783,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		if ( ! empty( $_GET['amazon_return_classic'] ) && ! empty( $_GET['amazonCheckoutSessionId'] ) ) {
 			$redirect_url = remove_query_arg( array( 'amazon_return_classic', 'amazonCheckoutSessionId' ), $redirect_url );
 
-			$this->handle_return( sanitize_text_field( $_GET['amazonCheckoutSessionId'] ) );
+			$this->handle_return( sanitize_text_field( wp_unslash( $_GET['amazonCheckoutSessionId'] ) ) );
 			// If we didn't redirect and quit yet, lets force redirect to checkout.
 			wp_safe_redirect( $redirect_url );
 			exit;
@@ -784,7 +803,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		if ( isset( $_GET['amazon_login'] ) && isset( $_GET['amazonCheckoutSessionId'] ) ) {
 			$redirect_url = remove_query_arg( array( 'amazon_login', 'amazonCheckoutSessionId' ), $redirect_url );
 			$session_key  = $this->get_checkout_session_key();
-			WC()->session->set( $session_key, sanitize_text_field( $_GET['amazonCheckoutSessionId'] ) );
+			WC()->session->set( $session_key, sanitize_text_field( wp_unslash( $_GET['amazonCheckoutSessionId'] ) ) );
 			$this->unset_force_refresh();
 			WC()->session->save_data();
 
@@ -807,7 +826,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		if ( isset( $_GET['amazon_return'] ) && isset( $_GET['amazonCheckoutSessionId'] ) ) {
 			$redirect_url = remove_query_arg( array( 'amazon_return', 'amazonCheckoutSessionId' ), $redirect_url );
 			if ( $_GET['amazonCheckoutSessionId'] !== $this->get_checkout_session_id() ) {
-				wc_add_notice( __( 'There was an error after returning from Amazon. Please try again.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+				wc_add_notice( esc_html__( 'There was an error after returning from Amazon. Please try again.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 				wp_safe_redirect( $redirect_url );
 				exit;
 			}
@@ -983,7 +1002,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 
 		$checkout_fields['account']['amazon_validate'] = array(
 			'type'     => 'password',
-			'label'    => __( 'Password', 'woocommerce' ), // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch
+			'label'    => esc_html__( 'Password', 'woocommerce-gateway-amazon-payments-advanced' ),
 			'required' => true,
 		);
 
@@ -1027,9 +1046,9 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		?>
 		<div id="payment_method_widget">
 			<?php
-			$change_label = __( 'Change', 'woocommerce-gateway-amazon-payments-advanced' );
+			$change_label = esc_html__( 'Change', 'woocommerce-gateway-amazon-payments-advanced' );
 			if ( ! $this->has_payment_preferences( $checkout_session ) ) {
-				$change_label = __( 'Select', 'woocommerce-gateway-amazon-payments-advanced' );
+				$change_label = esc_html__( 'Select', 'woocommerce-gateway-amazon-payments-advanced' );
 			}
 
 			?>
@@ -1204,7 +1223,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 									$key,
 									array(
 										'type'  => 'checkbox',
-										'label' => __( 'Link Amazon Pay Account', 'woocommerce-gateway-amazon-payments-advanced' ),
+										'label' => esc_html__( 'Link Amazon Pay Account', 'woocommerce-gateway-amazon-payments-advanced' ),
 									),
 									$value
 								);
@@ -1286,7 +1305,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		$data = array_merge( $data, array_intersect_key( $formatted_session_data, $data ) ); // only set data that exists in data.
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		if ( isset( $_REQUEST['amazon_link'] ) ) {
-			$data['amazon_link'] = esc_url_raw( $_REQUEST['amazon_link'] );
+			$data['amazon_link'] = esc_url_raw( wp_unslash( $_REQUEST['amazon_link'] ) );
 		}
 
 		return $data;
@@ -1322,7 +1341,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		switch ( $input ) {
 			case 'amazon_link':
 				if ( isset( $_REQUEST[ $input ] ) ) {
-					return sanitize_text_field( $_REQUEST[ $input ] );
+					return sanitize_text_field( wp_unslash( $_REQUEST[ $input ] ) );
 				}
 				break;
 			default:
@@ -1359,7 +1378,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			return;
 		}
 
-		$errors->add( 'amazon-pay-classic', __( 'A phone number is required to complete your checkout through Amazon Pay.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+		$errors->add( 'amazon-pay-classic', esc_html__( 'A phone number is required to complete your checkout through Amazon Pay.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 	}
 
 	/**
@@ -1387,13 +1406,13 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 
 		try {
 			if ( ! $order ) {
-				throw new Exception( __( 'Invalid order.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+				throw new Exception( esc_html__( 'Invalid order.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 			}
 
 			$doing_classic_payment = empty( $checkout_session_id );
 
 			if ( empty( $payments ) && ! $doing_classic_payment ) {
-				throw new Exception( __( 'An Amazon Pay payment method was not chosen.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+				throw new Exception( esc_html__( 'An Amazon Pay payment method was not chosen.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 			}
 
 			/**
@@ -1467,13 +1486,13 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 
 				if ( is_wp_error( $response ) ) {
 					wc_apa()->log( "Error processing payment for order {$order_id}. Checkout Session ID: {$checkout_session_id}", $response );
-					wc_add_notice( __( 'There was an error while processing your payment. Your payment method was not charged. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+					wc_add_notice( esc_html__( 'There was an error while processing your payment. Your payment method was not charged. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 					return array();
 				}
 
 				if ( ! empty( $response->constraints ) ) {
 					wc_apa()->log( "Error processing payment for order {$order_id}. Checkout Session ID: {$checkout_session_id}.", $response->constraints );
-					wc_add_notice( __( 'There was an error while processing your payment. Your payment method was not charged. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+					wc_add_notice( esc_html__( 'There was an error while processing your payment. Your payment method was not charged. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 					return array();
 				}
 				$redirect = $response->webCheckoutDetails->amazonPayRedirectUrl; // phpcs:ignore WordPress.NamingConventions
@@ -1484,7 +1503,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 				if ( ! empty( wc_apa()->get_subscriptions() ) && wc_apa()->get_subscriptions()->is_subs_change_payment() ) {
 					$redirect = ! empty( $payload['webCheckoutDetails']['checkoutResultReturnUrl'] ) ? $payload['webCheckoutDetails']['checkoutResultReturnUrl'] : $order->get_change_payment_method_url();
 				} else {
-					$order->update_status( 'pending', __( 'Awaiting payment.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+					$order->update_status( 'pending', esc_html__( 'Awaiting payment.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 					$redirect = '#';
 				}
 			}
@@ -1511,7 +1530,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 
 			return $result;
 		} catch ( Exception $e ) {
-			wc_add_notice( __( 'Error:', 'woocommerce-gateway-amazon-payments-advanced' ) . ' ' . $e->getMessage(), 'error' );
+			wc_add_notice( esc_html__( 'Error:', 'woocommerce-gateway-amazon-payments-advanced' ) . ' ' . $e->getMessage(), 'error' );
 		}
 		return array();
 	}
@@ -1572,7 +1591,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 
 		if ( empty( $order_id ) ) {
 			wc_apa()->log( "Error: Order could not be found. Checkout Session ID: {$checkout_session_id}." );
-			wc_add_notice( __( 'There was an error while processing your payment. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+			wc_add_notice( esc_html__( 'There was an error while processing your payment. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 			return;
 		}
 
@@ -1584,7 +1603,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		$order_address_updated = $this->maybe_update_order_addresses( $order, $checkout_session, $checkout_session_id );
 		if ( false === $order_address_updated ) {
 			wc_apa()->log( "Error: Order address mismatch and could not be updated. Checkout Session ID: {$checkout_session_id}." );
-			wc_add_notice( __( 'There was an error while processing your payment. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+			wc_add_notice( esc_html__( 'There was an error while processing your payment. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 			return;
 		} elseif ( is_wp_error( $order_address_updated ) ) {
 			wc_apa()->log( "Error: " . $order_address_updated->get_error_message() . " Checkout Session ID: {$checkout_session_id}." );
@@ -1621,17 +1640,17 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 				$reason_code = $checkout_session->statusDetails->reasonCode; // phpcs:ignore WordPress.NamingConventions
 				$order->add_order_note(
 					sprintf(
-						__( 'Amazon Pay checkout was canceled. Reason(s): %s', 'woocommerce-gateway-amazon-payments-advanced' ),
-						$reason_code ? $reason_code : __( 'Unknown', 'woocommerce-gateway-amazon-payments-advanced' )
+						esc_html__( 'Amazon Pay checkout was canceled. Reason(s): %s', 'woocommerce-gateway-amazon-payments-advanced' ),
+						$reason_code ? $reason_code : esc_html__( 'Unknown', 'woocommerce-gateway-amazon-payments-advanced' )
 					)
 				);
 
 				switch ( $reason_code ) {
 					case 'Declined':
-						wc_add_notice( __( 'There was a problem with previously declined transaction. Please try placing the order again.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+						wc_add_notice( esc_html__( 'There was a problem with previously declined transaction. Please try placing the order again.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 						break;
 					case 'BuyerCanceled':
-						wc_add_notice( __( 'The transaction was canceled by you. Please try placing the order again.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+						wc_add_notice( esc_html__( 'The transaction was canceled by you. Please try placing the order again.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 						break;
 					default:
 						$detail_debug = array(
@@ -1639,13 +1658,13 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 							'checkout_session' => $checkout_session,
 						);
 						wc_apa()->log( "Error processing payment for order {$order_id}. Checkout Session ID: {$checkout_session_id}.", $detail_debug );
-						wc_add_notice( __( 'There was an error while processing your payment. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+						wc_add_notice( esc_html__( 'There was an error while processing your payment. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 						break;
 				}
 
-				$this->do_force_refresh( __( 'Click the button below to select another payment method', 'woocommerce-gateway-amazon-payments-advanced' ) );
+				$this->do_force_refresh( esc_html__( 'Click the button below to select another payment method', 'woocommerce-gateway-amazon-payments-advanced' ) );
 			} else {
-				wc_add_notice( __( 'Error:', 'woocommerce-gateway-amazon-payments-advanced' ) . ' ' . $response->get_error_message(), 'error' );
+				wc_add_notice( esc_html__( 'Error:', 'woocommerce-gateway-amazon-payments-advanced' ) . ' ' . $response->get_error_message(), 'error' );
 			}
 			$this->release_lock_for_order( $order_id );
 			return;
@@ -1654,7 +1673,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		if ( 'Completed' !== $response->statusDetails->state ) { // phpcs:ignore WordPress.NamingConventions
 			// ASK: Ask for posibilities of status not to be completed at this stage.
 			wc_apa()->log( "Error processing payment for order {$order_id}. Checkout Session ID: {$checkout_session_id}.", $response->statusDetails ); // phpcs:ignore WordPress.NamingConventions
-			wc_add_notice( __( 'There was an error while processing your payment. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+			wc_add_notice( esc_html__( 'There was an error while processing your payment. Please try again. If the error persist, please contact us about your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 			$this->release_lock_for_order( $order_id );
 			return;
 		}
@@ -1824,7 +1843,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		$order->add_order_note(
 			sprintf(
 				/* translators: 1) Amazon Charge ID 2) Charge status */
-				__( 'Charge %1$s with status %2$s.', 'woocommerce-gateway-amazon-payments-advanced' ),
+				esc_html__( 'Charge %1$s with status %2$s.', 'woocommerce-gateway-amazon-payments-advanced' ),
 				(string) $charge_id,
 				(string) $charge_status
 			)
@@ -1928,7 +1947,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			case 'Closed':
 				$order_has_charge = is_null( $this->get_cached_charge_status( $order, true )->status );
 				if ( apply_filters( 'woocommerce_amazon_pa_charge_permission_status_should_fail_order', $order_has_charge, $order ) ) {
-					$order->update_status( 'failed', __( 'Amazon charge status was closed, moving order to failed.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+					$order->update_status( 'failed', esc_html__( 'Amazon charge status was closed, moving order to failed.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 					wc_maybe_increase_stock_levels( $order->get_id() );
 				}
 				break;
@@ -1953,7 +1972,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		// @codingStandardsIgnoreStart
 		$order->add_order_note( sprintf(
 			/* translators: 1) Amazon Charge ID 2) Charge status */
-			__( 'Charge Permission %1$s with status %2$s.', 'woocommerce-gateway-amazon-payments-advanced' ),
+			esc_html__( 'Charge Permission %1$s with status %2$s.', 'woocommerce-gateway-amazon-payments-advanced' ),
 			(string) $charge_permission_id,
 			(string) $new_status
 		) );
@@ -2068,7 +2087,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 				<p class="wc_apa_login_again_text">
 				<?php
 				if ( empty( $message ) ) {
-					$message = __( 'Your cart changed, and you need to confirm your selected payment method again.', 'woocommerce-gateway-amazon-payments-advanced' );
+					$message = esc_html__( 'Your cart changed, and you need to confirm your selected payment method again.', 'woocommerce-gateway-amazon-payments-advanced' );
 				}
 
 				echo esc_html( $message );
@@ -2187,15 +2206,15 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 
 		$props_validation = $this->validate_session_properties( $checkout_session );
 		if ( is_wp_error( $props_validation ) ) {
-			return new WP_Error( 'session_changed', __( 'Something went wrong with your session. Please log in again.', 'woocommerce-gateway-amazon-payments-advanced' ), $props_validation->get_error_data() );
+			return new WP_Error( 'session_changed', esc_html__( 'Something went wrong with your session. Please log in again.', 'woocommerce-gateway-amazon-payments-advanced' ), $props_validation->get_error_data() );
 		}
 
 		if ( 'Open' !== $checkout_session->statusDetails->state ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
-			return new WP_Error( 'not_open', __( 'Something went wrong with your session. Please log in again.', 'woocommerce-gateway-amazon-payments-advanced' ), $checkout_session->statusDetails->state ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			return new WP_Error( 'not_open', esc_html__( 'Something went wrong with your session. Please log in again.', 'woocommerce-gateway-amazon-payments-advanced' ), $checkout_session->statusDetails->state ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		}
 
 		if ( $checkout_session->productType !== $this->get_current_cart_action() ) { // phpcs:ignore WordPress.NamingConventions
-			return new WP_Error( 'product_type_changed', __( 'Your cart changed, and you need to confirm your selected payment method again.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+			return new WP_Error( 'product_type_changed', esc_html__( 'Your cart changed, and you need to confirm your selected payment method again.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 		}
 		return apply_filters( 'woocommerce_amazon_pa_is_checkout_session_still_valid', true, $checkout_session );
 	}
@@ -2223,12 +2242,12 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 	public function process_admin_options() {
 		if ( check_admin_referer( 'woocommerce-settings' ) ) {
 			if ( ! empty( $_POST['woocommerce_amazon_payments_advanced_button_language'] ) ) {
-				$region   = sanitize_text_field( $_POST['woocommerce_amazon_payments_advanced_payment_region'] );
-				$language = sanitize_text_field( $_POST['woocommerce_amazon_payments_advanced_button_language'] );
+				$region   = isset( $_POST['woocommerce_amazon_payments_advanced_payment_region'] ) ? sanitize_text_field( wp_unslash( $_POST['woocommerce_amazon_payments_advanced_payment_region'] ) ) : '';
+				$language = sanitize_text_field( wp_unslash( $_POST['woocommerce_amazon_payments_advanced_button_language'] ) );
 				$regions  = WC_Amazon_Payments_Advanced_API::get_languages_per_region();
 				if ( ! isset( $regions[ $region ] ) || ! in_array( $language, $regions[ $region ], true ) ) {
 					/* translators: 1) Language 2) Region */
-					WC_Admin_Settings::add_error( sprintf( __( '%1$s is not a valid language for the %2$s region.', 'woocommerce-gateway-amazon-payments-advanced' ), $language, WC_Amazon_Payments_Advanced_API::get_region_label( $region ) ) );
+					WC_Admin_Settings::add_error( sprintf( esc_html__( '%1$s is not a valid language for the %2$s region.', 'woocommerce-gateway-amazon-payments-advanced' ), $language, WC_Amazon_Payments_Advanced_API::get_region_label( $region ) ) );
 					$_POST['woocommerce_amazon_payments_advanced_button_language'] = '';
 				}
 			}
@@ -2803,24 +2822,25 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 				WC()->customer->save();
 
 				if ( ! empty( $_POST['terms-field'] ) && empty( $_POST['terms'] ) ) {
-					wc_add_notice( __( 'Please read and accept the terms and conditions to proceed with your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
+					wc_add_notice( esc_html__( 'Please read and accept the terms and conditions to proceed with your order.', 'woocommerce-gateway-amazon-payments-advanced' ), 'error' );
 					self::send_ajax_failure_response();
 				}
 
 				// Update payment method.
 				if ( $order->needs_payment() ) {
 					try {
+						// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 						$payment_method_id = isset( $_POST['payment_method'] ) ? wc_clean( wp_unslash( $_POST['payment_method'] ) ) : false;
 
 						if ( ! $payment_method_id ) {
-							throw new Exception( __( 'Invalid payment method.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+							throw new Exception( esc_html__( 'Invalid payment method.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 						}
 
 						$available_gateways = WC()->payment_gateways->get_available_payment_gateways();
 						$payment_method     = isset( $available_gateways[ $payment_method_id ] ) ? $available_gateways[ $payment_method_id ] : false;
 
 						if ( ! $payment_method ) {
-							throw new Exception( __( 'Invalid payment method.', 'woocommerce-gateway-amazon-payments-advanced' ) );
+							throw new Exception( esc_html__( 'Invalid payment method.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 						}
 
 						$order->set_payment_method( $payment_method );
@@ -3163,8 +3183,11 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		$args = array();
 		// phpcs:disable WordPress.Security.NonceVerification
 		if ( isset( $_GET['switch-subscription'] ) && isset( $_GET['item'] ) && isset( $_GET['_wcsnonce'] ) ) {
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			$args['switch-subscription'] = wc_clean( wp_unslash( $_GET['switch-subscription'] ) );
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			$args['item']                = wc_clean( wp_unslash( $_GET['item'] ) );
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			$args['_wcsnonce']           = wc_clean( wp_unslash( $_GET['_wcsnonce'] ) );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification

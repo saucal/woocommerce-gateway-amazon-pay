@@ -50,7 +50,7 @@ class WC_Amazon_Payments_Advanced_Multi_Currency_PPBC extends WC_Amazon_Payments
 		// This is for sandbox mode, changing countries manually.
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		if ( isset( $_REQUEST['wcpbc-manual-country'] ) ) {
-			$manual_country = wc_clean( wp_unslash( $_REQUEST['wcpbc-manual-country'] ) );
+			$manual_country = sanitize_text_field( wp_unslash( $_REQUEST['wcpbc-manual-country'] ) );
 			$selected_zone  = WCPBC_Pricing_Zones::get_zone_by_country( $manual_country );
 		} else {
 			$selected_zone = wcpbc_get_zone_by_country();

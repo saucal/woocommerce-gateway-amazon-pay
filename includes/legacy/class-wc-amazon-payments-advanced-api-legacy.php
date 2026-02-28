@@ -383,11 +383,11 @@ class WC_Amazon_Payments_Advanced_API_Legacy extends WC_Amazon_Payments_Advanced
 	 */
 	public static function get_reference_id() {
 		//phpcs:disable WordPress.Security.NonceVerification
-		$reference_id = ! empty( $_REQUEST['amazon_reference_id'] ) ? sanitize_text_field( $_REQUEST['amazon_reference_id'] ) : '';
+		$reference_id = ! empty( $_REQUEST['amazon_reference_id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['amazon_reference_id'] ) ) : '';
 
 		if ( isset( $_POST['post_data'] ) ) {
 			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-			parse_str( $_POST['post_data'], $post_data );
+			parse_str( wp_unslash( $_POST['post_data'] ), $post_data );
 
 			if ( isset( $post_data['amazon_reference_id'] ) ) {
 				$reference_id = $post_data['amazon_reference_id'];
@@ -405,7 +405,7 @@ class WC_Amazon_Payments_Advanced_API_Legacy extends WC_Amazon_Payments_Advanced
 	 */
 	public static function get_access_token() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$access_token = ! empty( $_REQUEST['access_token'] ) ? sanitize_text_field( $_REQUEST['access_token'] ) : ( isset( $_COOKIE['amazon_Login_accessToken'] ) && ! empty( $_COOKIE['amazon_Login_accessToken'] ) ? sanitize_text_field( $_COOKIE['amazon_Login_accessToken'] ) : '' );
+		$access_token = ! empty( $_REQUEST['access_token'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['access_token'] ) ) : ( isset( $_COOKIE['amazon_Login_accessToken'] ) && ! empty( $_COOKIE['amazon_Login_accessToken'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['amazon_Login_accessToken'] ) ) : '' );
 
 		return self::check_session( 'access_token', $access_token );
 	}

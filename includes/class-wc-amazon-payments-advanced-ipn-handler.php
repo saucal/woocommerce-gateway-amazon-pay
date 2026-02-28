@@ -133,7 +133,12 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 	 */
 	protected function validate_message( $message ) {
 		if ( ! function_exists( 'openssl_get_publickey' ) || ! function_exists( 'openssl_verify' ) ) {
-			throw new Exception( 'OpenSSL extension is not available in your server.' );
+			throw new Exception(
+				esc_html__(
+					'OpenSSL extension is not available on your server.',
+					'woocommerce-gateway-amazon-payments-advanced'
+				)
+			);
 		}
 
 		if ( $this->is_lambda_style( $message ) ) {
@@ -147,7 +152,12 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 		// Extract the public key.
 		$key = openssl_get_publickey( $certificate );
 		if ( ! $key ) {
-			throw new Exception( 'Cannot get the public key from the certificate.' );
+			throw new Exception(
+				esc_html__(
+					'Cannot get the public key from the certificate.',
+					'woocommerce-gateway-amazon-payments-advanced'
+				)
+			);
 		}
 
 		// Verify the signature of the message.
@@ -155,7 +165,12 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 		$signature = base64_decode( $message['Signature'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
 
 		if ( 1 !== openssl_verify( $content, $signature, $key, OPENSSL_ALGO_SHA1 ) ) {
-			throw new Exception( 'The message signature is invalid.' );
+			throw new Exception(
+				esc_html__(
+					'The message signature is invalid.',
+					'woocommerce-gateway-amazon-payments-advanced'
+				)
+			);
 		}
 	}
 
@@ -217,7 +232,12 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 			|| 'https' !== $parsed_url['scheme']
 			|| '.pem' !== substr( $url, -4 )
 			|| ! preg_match( $this->host_pattern, $parsed_url['host'] ) ) {
-			throw new Exception( 'Invalid certificate URL.' );
+			throw new Exception(
+				esc_html__(
+					'Invalid certificate URL.',
+					'woocommerce-gateway-amazon-payments-advanced'
+				)
+			);
 		}
 	}
 
@@ -246,7 +266,12 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 		);
 
 		if ( self::SIGNATURE_VERSION_1 !== $message['SignatureVersion'] ) {
-			throw new Exception( 'The SignatureVersion ' . $message['SignatureVersion'] . ' is not supported.' );
+			throw new Exception(
+				sprintf(
+					esc_html__( 'The SignatureVersion %s is not supported.', 'woocommerce-gateway-amazon-payments-advanced' ),
+					esc_html( $message['SignatureVersion'] )
+				)
+			);
 		}
 
 		$string_to_sign = '';
@@ -289,7 +314,12 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 				do_action( 'woocommerce_amazon_payments_advanced_ipn_validate_subscription_keys', $message );
 				break;
 			default:
-				throw new Exception( 'No handler for message type ' . $message['Type'] );
+				throw new Exception(
+					sprintf(
+						esc_html__( 'No handler for message type %s', 'woocommerce-gateway-amazon-payments-advanced' ),
+						esc_html( $message['Type'] )
+					)
+				);
 		}
 
 		wc_apa()->log( sprintf( 'Valid IPN message %s.', $message['MessageId'] ) );
@@ -313,7 +343,12 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 		$message    = json_decode( $raw_post_data, true );
 		$json_error = json_last_error();
 		if ( JSON_ERROR_NONE !== $json_error || ! is_array( $message ) ) {
-			throw new Exception( 'Invalid POST data. Failed to decode the message: ' . $this->get_json_error_message( $json_error ) );
+			throw new Exception(
+				sprintf(
+					esc_html__( 'Invalid POST data. Failed to decode the message: %s', 'woocommerce-gateway-amazon-payments-advanced' ),
+					$this->get_json_error_message( $json_error )
+				)
+			);
 		}
 
 		return $message;
@@ -366,7 +401,7 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 
 		try {
 			if ( empty( $raw_post_data ) ) {
-				throw new Exception( 'Empty post data.' );
+				throw new Exception( esc_html__( 'Empty post data.', 'woocommerce-gateway-amazon-payments-advanced' ) );
 			}
 
 			$message = $this->get_message_from_raw_post_data( $raw_post_data );
@@ -420,7 +455,7 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 					$charge_id = (string) $notification_data->RefundDetails->AmazonRefundId; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 					break;
 				default:
-					wc_apa()->log( 'No handler for notification with type ' . $message['Message']['NotificationType'], $notification_data );
+					wc_apa()->log( sprintf( 'No handler for notification with type %s', esc_html( $message['Message']['NotificationType'] ) ), $notification_data );
 					return;
 			}
 
@@ -455,7 +490,7 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 				$order_id = $charge->merchantMetadata->merchantReferenceId; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 				break;
 			default:
-				throw new Exception( 'Not Implemented' );
+				throw new Exception( esc_html__( 'Not Implemented', 'woocommerce-gateway-amazon-payments-advanced' ) );
 		}
 
 		$order_id = apply_filters( 'woocommerce_amazon_pa_merchant_metadata_reference_id_reverse', $order_id );
@@ -463,19 +498,33 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 		if ( is_numeric( $order_id ) ) {
 			$order = wc_get_order( $order_id );
 		} else {
-			throw new Exception( 'Invalid order ID ' . $order_id );
+			throw new Exception(
+				sprintf(
+					esc_html__( 'Invalid order ID %s.', 'woocommerce-gateway-amazon-payments-advanced' ),
+					esc_html( $order_id )
+				)
+			);
 		}
 
 		$order    = apply_filters( 'woocommerce_amazon_pa_ipn_notification_order', $order, $notification );
 		$order_id = $order->get_id(); // Refresh variable, in case it changed.
 
 		if ( 'amazon_payments_advanced' !== $order->get_payment_method() ) {
-			throw new Exception( 'Order ID ' . $order_id . ' is not paid with Amazon' );
+			throw new Exception(
+				sprintf(
+					esc_html__( 'Order ID %s is not paid with Amazon', 'woocommerce-gateway-amazon-payments-advanced' ),
+					esc_html( $order_id )
+				)
+			);
 		}
 
 		if ( 'STATE_CHANGE' !== strtoupper( $notification['NotificationType'] ) ) {
-			/* translators: 1) Notification Type. */
-			throw new Exception( sprintf( __( 'Notification type "%s" not supported', 'woocommerce-gateway-amazon-payments-advanced' ), $notification['NotificationType'] ) );
+			throw new Exception( 
+				sprintf( 
+					esc_html__( 'Notification type "%s" not supported', 'woocommerce-gateway-amazon-payments-advanced' ), 
+					esc_html( $notification['NotificationType'] ) 
+				) 
+			);
 		}
 
 		if ( ! wc_apa()->get_gateway()->get_lock_for_order( $order_id ) ) {
@@ -506,7 +555,9 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 				break;
 			default:
 				wc_apa()->get_gateway()->release_lock_for_order( $order_id );
-				throw new Exception( 'Not Implemented' );
+				throw new Exception( 
+					esc_html__( 'Not implemented.', 'woocommerce-gateway-amazon-payments-advanced' )
+				);
 		}
 
 		wc_apa()->get_gateway()->release_lock_for_order( $order_id );
