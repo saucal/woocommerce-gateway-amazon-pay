@@ -466,7 +466,16 @@ class WC_Amazon_Payments_Advanced_IPN_Handler extends WC_Amazon_Payments_Advance
 			throw new Exception( 'Invalid order ID ' . $order_id );
 		}
 
-		$order    = apply_filters( 'woocommerce_amazon_pa_ipn_notification_order', $order, $notification );
+		if ( ! $order instanceof \WC_Order ) {
+			throw new Exception( 'Order not found for ID ' . $order_id );
+		}
+
+		$order = apply_filters( 'woocommerce_amazon_pa_ipn_notification_order', $order, $notification );
+
+		if ( ! $order instanceof \WC_Order ) {
+			throw new Exception( 'Invalid order returned from woocommerce_amazon_pa_ipn_notification_order filter' );
+		}
+
 		$order_id = $order->get_id(); // Refresh variable, in case it changed.
 
 		if ( 'amazon_payments_advanced' !== $order->get_payment_method() ) {
