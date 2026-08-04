@@ -80,6 +80,10 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 
 == Changelog ==
 
+= 2.6.3 - 2026-xx-xx =
+
+* Update - Amazon Pay SDK to v2.7.2.
+
 = 2.6.2 - 2026-07-22 =
 
 * Fix - Fatal error in the IPN handler (v2) when the related order could not be retrieved.
