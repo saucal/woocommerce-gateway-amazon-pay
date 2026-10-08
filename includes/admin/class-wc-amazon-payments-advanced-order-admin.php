@@ -194,7 +194,7 @@ class WC_Amazon_Payments_Advanced_Order_Admin {
 	 * @param  string   $version Version of the order.
 	 */
 	public function auth_box_render( $order, $version ) {
-		if ( 'v2' !== strtolower( $version ) ) {
+		if ( 'v2' !== strtolower( $version ) || ! method_exists( wc_apa()->get_gateway(), 'get_cached_charge_permission_status' ) ) {
 			return;
 		}
 
