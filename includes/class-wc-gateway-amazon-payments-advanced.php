@@ -1787,21 +1787,24 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 
 
 	/**
-	 * Check whether a charge in this state still expects a transition from Amazon.
+	 * Get the time of the next charge check.
 	 *
-	 * @param string $state Charge state.
+	 * @param object $charge Charge object from the Amazon API.
 	 *
-	 * @return bool
+	 * @return int
 	 */
-	protected function charge_needs_polling( $state ) {
-		switch ( $state ) {
+	protected function charge_poll_time( $charge ) {
+		switch ( $charge->statusDetails->state ) { // phpcs:ignore WordPress.NamingConventions
 			case 'AuthorizationInitiated':
 			case 'CaptureInitiated':
-				return true;
+				return strtotime( '+10 minutes' );
 			case 'Authorized':
-				return ! in_array( $this->settings['payment_capture'], array( 'authorize', 'manual' ), true );
+				if ( in_array( $this->settings['payment_capture'], array( 'authorize', 'manual' ), true ) ) {
+					return strtotime( '+1 day' );
+				}
+				return strtotime( '+10 minutes' );
 		}
-		return false;
+		return 0;
 	}
 
 	/**
@@ -1846,8 +1849,9 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		$order->read_meta_data( true ); // Force read from db to avoid concurrent notifications.
 		$old_status    = $this->get_cached_charge_status( $order, true )->status;
 		$charge_status = $charge->statusDetails->state; // phpcs:ignore WordPress.NamingConventions
-		if ( $this->charge_needs_polling( $charge_status ) ) {
-			wc_apa()->ipn_handler->schedule_hook( $charge_id, 'CHARGE' );
+		$poll_time     = $this->charge_poll_time( $charge );
+		if ( $poll_time ) {
+			wc_apa()->ipn_handler->schedule_hook( $charge_id, 'CHARGE', null, $poll_time );
 		} else {
 			wc_apa()->ipn_handler->unschedule_hook( $charge_id, 'CHARGE' );
 		}
@@ -1902,20 +1906,24 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 	}
 
 	/**
-	 * Check whether a charge permission poll should be scheduled.
+	 * Get the time of the next charge permission check.
 	 *
 	 * @param WC_Order $order             Order object.
 	 * @param object   $charge_permission Charge permission object from the Amazon API.
 	 * @param bool     $status_changed    Whether the state differs from the cached one.
 	 *
-	 * @return bool
+	 * @return int
 	 */
-	protected function charge_permission_needs_polling( $order, $charge_permission, $status_changed ) {
+	protected function charge_permission_poll_time( $order, $charge_permission, $status_changed ) {
 		$state = $charge_permission->statusDetails->state; // phpcs:ignore WordPress.NamingConventions
 		if ( 'OneTime' !== $charge_permission->chargePermissionType ) { // phpcs:ignore WordPress.NamingConventions
-			return in_array( $state, array( 'Chargeable', 'NonChargeable' ), true );
+			return in_array( $state, array( 'Chargeable', 'NonChargeable' ), true ) ? strtotime( '+10 minutes' ) : 0;
 		}
-		return $status_changed && 'NonChargeable' === $state && 'Captured' === $this->get_cached_charge_status( $order, true )->status;
+		$charge_status = $this->get_cached_charge_status( $order, true )->status;
+		if ( 'Chargeable' === $state && null === $charge_status ) {
+			return strtotime( '+1 week' );
+		}
+		return $status_changed && 'NonChargeable' === $state && 'Captured' === $charge_status ? strtotime( '+10 minutes' ) : 0;
 	}
 
 	/**
@@ -1962,8 +1970,9 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		$order->read_meta_data( true ); // Force read from db to avoid concurrent notifications.
 		$old_status               = $this->get_cached_charge_permission_status( $order, true )->status;
 		$charge_permission_status = $charge_permission->statusDetails->state; // phpcs:ignore WordPress.NamingConventions
-		if ( $this->charge_permission_needs_polling( $order, $charge_permission, $charge_permission_status !== $old_status ) ) {
-			wc_apa()->ipn_handler->schedule_hook( $charge_permission_id, 'CHARGE_PERMISSION', $order );
+		$poll_time                = $this->charge_permission_poll_time( $order, $charge_permission, $charge_permission_status !== $old_status );
+		if ( $poll_time ) {
+			wc_apa()->ipn_handler->schedule_hook( $charge_permission_id, 'CHARGE_PERMISSION', $order, $poll_time );
 		} else {
 			wc_apa()->ipn_handler->unschedule_hook( $charge_permission_id, 'CHARGE_PERMISSION' );
 		}

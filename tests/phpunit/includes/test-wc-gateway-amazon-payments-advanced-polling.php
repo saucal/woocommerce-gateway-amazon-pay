@@ -34,6 +34,20 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 	protected static $counter = 0;
 
 	/**
+	 * Charge permission id used by the last run_cp_case() call.
+	 *
+	 * @var string
+	 */
+	protected $last_cp_id = '';
+
+	/**
+	 * Polling interval recorded by the filter.
+	 *
+	 * @var int
+	 */
+	protected $filtered_interval = 0;
+
+	/**
 	 * Set up the gateway instance.
 	 *
 	 * @return void
@@ -84,16 +98,38 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Run log_charge_status_change and return the pending poll count.
+	 * Get the earliest pending poll time for an object, or 0 for none.
+	 *
+	 * @param string $id   Object id.
+	 * @param string $type Object type.
+	 *
+	 * @return int
+	 */
+	protected function next_poll_time( $id, $type ) {
+		$actions = as_get_scheduled_actions(
+			array(
+				'hook'     => self::HOOK,
+				'args'     => array( $id, $type ),
+				'status'   => ActionScheduler_Store::STATUS_PENDING,
+				'per_page' => 1,
+				'orderby'  => 'date',
+				'order'    => 'ASC',
+			)
+		);
+		return $actions ? reset( $actions )->get_schedule()->get_date()->getTimestamp() : 0;
+	}
+
+	/**
+	 * Run log_charge_status_change and return the order, pending poll count and next poll time.
 	 *
 	 * @param string $mode      Capture mode setting.
 	 * @param string $state     Charge state.
 	 * @param bool   $unchanged Whether the cached status already equals the state.
-	 * @param bool   $prequeue  Whether to pre-queue a poll.
+	 * @param int    $prequeue  Seconds ahead to pre-queue a poll, 0 for none.
 	 *
-	 * @return array Order and pending poll count.
+	 * @return array
 	 */
-	protected function run_case( $mode, $state, $unchanged, $prequeue = false ) {
+	protected function run_case( $mode, $state, $unchanged, $prequeue = 0 ) {
 		self::$counter++;
 		$charge_id = 'P01-337-' . self::$counter . '-' . wp_generate_password( 6, false );
 
@@ -115,53 +151,91 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 		$order->save();
 
 		if ( $prequeue ) {
-			as_schedule_single_action( time() + 600, self::HOOK, array( $charge_id, 'CHARGE' ), self::HOOK );
+			as_schedule_single_action( time() + $prequeue, self::HOOK, array( $charge_id, 'CHARGE' ), self::HOOK );
 		}
 
 		$this->gateway->log_charge_status_change( $order, $this->make_charge( $charge_id, $state ) );
 
-		return array( $order, $this->count_polls( $charge_id ) );
+		return array( $order, $this->count_polls( $charge_id ), $this->next_poll_time( $charge_id, 'CHARGE' ) );
 	}
 
 	/**
-	 * Authorize mode, Authorized, unchanged does not poll.
+	 * Authorize mode, Authorized, unchanged re-checks once a day.
 	 *
 	 * @return void
 	 */
-	public function test_authorize_authorized_unchanged_does_not_poll() : void {
-		list( , $count ) = $this->run_case( 'authorize', 'Authorized', true );
-		$this->assertSame( 0, $count );
+	public function test_authorize_authorized_unchanged_rechecks_daily() : void {
+		list( , $count, $next ) = $this->run_case( 'authorize', 'Authorized', true );
+		$this->assertSame( 1, $count );
+		$this->assertEqualsWithDelta( time() + DAY_IN_SECONDS, $next, 60 );
 	}
 
 	/**
-	 * Authorize mode, Authorized, changed does not poll and sets on-hold.
+	 * Authorize mode, Authorized, changed re-checks once a day and sets on-hold.
 	 *
 	 * @return void
 	 */
-	public function test_authorize_authorized_changed_does_not_poll() : void {
-		list( $order, $count ) = $this->run_case( 'authorize', 'Authorized', false );
-		$this->assertSame( 0, $count );
+	public function test_authorize_authorized_changed_rechecks_daily() : void {
+		list( $order, $count, $next ) = $this->run_case( 'authorize', 'Authorized', false );
+		$this->assertSame( 1, $count );
+		$this->assertEqualsWithDelta( time() + DAY_IN_SECONDS, $next, 60 );
 		$this->assertSame( 'on-hold', wc_get_order( $order->get_id() )->get_status() );
 	}
 
 	/**
-	 * Authorize mode, Authorized, unchanged removes a pre-queued poll.
+	 * Authorize mode, Authorized, keeps an earlier pre-queued poll.
 	 *
 	 * @return void
 	 */
-	public function test_authorize_authorized_unchanged_unschedules_prequeued() : void {
-		list( , $count ) = $this->run_case( 'authorize', 'Authorized', true, true );
-		$this->assertSame( 0, $count );
+	public function test_authorize_authorized_keeps_earlier_prequeued() : void {
+		list( , $count, $next ) = $this->run_case( 'authorize', 'Authorized', true, 600 );
+		$this->assertSame( 1, $count );
+		$this->assertEqualsWithDelta( time() + 600, $next, 60 );
 	}
 
 	/**
-	 * Manual mode, Authorized, changed does not poll.
+	 * Manual mode, Authorized, changed re-checks once a day.
 	 *
 	 * @return void
 	 */
-	public function test_manual_authorized_changed_does_not_poll() : void {
-		list( , $count ) = $this->run_case( 'manual', 'Authorized', false );
-		$this->assertSame( 0, $count );
+	public function test_manual_authorized_changed_rechecks_daily() : void {
+		list( , $count, $next ) = $this->run_case( 'manual', 'Authorized', false );
+		$this->assertSame( 1, $count );
+		$this->assertEqualsWithDelta( time() + DAY_IN_SECONDS, $next, 60 );
+	}
+
+	/**
+	 * Record the polling interval passed to the filter.
+	 *
+	 * @param int $interval Polling time.
+	 *
+	 * @return int
+	 */
+	public function record_polling_interval( $interval ) {
+		$this->filtered_interval = $interval;
+		return $interval;
+	}
+
+	/**
+	 * The polling interval filter receives the daily re-check time.
+	 *
+	 * @return void
+	 */
+	public function test_polling_interval_filter_receives_recheck_time() : void {
+		add_filter( 'woocommerce_amazon_pa_polling_interval', array( $this, 'record_polling_interval' ) );
+		$this->run_case( 'authorize', 'Authorized', true );
+		$this->assertEqualsWithDelta( time() + DAY_IN_SECONDS, $this->filtered_interval, 60 );
+	}
+
+	/**
+	 * An in-flight state pulls a later pending poll forward.
+	 *
+	 * @return void
+	 */
+	public function test_in_flight_pulls_later_poll_forward() : void {
+		list( , $count, $next ) = $this->run_case( 'authorize', 'CaptureInitiated', true, DAY_IN_SECONDS );
+		$this->assertSame( 1, $count );
+		$this->assertEqualsWithDelta( time() + 10 * MINUTE_IN_SECONDS, $next, 60 );
 	}
 
 	/**
@@ -224,7 +298,7 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 	 * @return void
 	 */
 	public function test_terminal_state_unschedules_prequeued( $state ) : void {
-		list( , $count ) = $this->run_case( '', $state, true, true );
+		list( , $count ) = $this->run_case( '', $state, true, 600 );
 		$this->assertSame( 0, $count );
 	}
 
@@ -289,13 +363,15 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 	 * @param string|null $cached_state  Cached CP state, null for none.
 	 * @param string|null $charge_status Cached charge state, null for no charge.
 	 * @param string      $type          CP type.
-	 * @param bool        $prequeue      Whether to pre-queue a CP poll.
+	 * @param int         $prequeue      Seconds ahead to pre-queue a CP poll, 0 for none.
 	 *
 	 * @return int
 	 */
-	protected function run_cp_case( $state, $cached_state, $charge_status, $type = 'OneTime', $prequeue = false ) {
+	protected function run_cp_case( $state, $cached_state, $charge_status, $type = 'OneTime', $prequeue = 0 ) {
 		self::$counter++;
 		$cp_id = 'P01-336-' . self::$counter . '-' . wp_generate_password( 6, false );
+
+		$this->last_cp_id = $cp_id;
 
 		$order = WC_Helper_Order::create_order( 'amazon_payments_advanced' );
 		$order->update_meta_data( 'amazon_charge_permission_id', $cp_id );
@@ -326,7 +402,7 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 		$order->save();
 
 		if ( $prequeue ) {
-			as_schedule_single_action( time() + 600, self::HOOK, array( $cp_id, 'CHARGE_PERMISSION' ), self::HOOK );
+			as_schedule_single_action( time() + $prequeue, self::HOOK, array( $cp_id, 'CHARGE_PERMISSION' ), self::HOOK );
 		}
 
 		$this->gateway->log_charge_permission_status_change( $order, $this->make_charge_permission( $cp_id, $state, $type ) );
@@ -340,7 +416,7 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 	 * @return void
 	 */
 	public function test_cp_closed_changed_unschedules_prequeued() : void {
-		$this->assertSame( 0, $this->run_cp_case( 'Closed', 'NonChargeable', 'Captured', 'OneTime', true ) );
+		$this->assertSame( 0, $this->run_cp_case( 'Closed', 'NonChargeable', 'Captured', 'OneTime', 600 ) );
 	}
 
 	/**
@@ -358,16 +434,17 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 	 * @return void
 	 */
 	public function test_cp_chargeable_unchanged_unschedules_prequeued() : void {
-		$this->assertSame( 0, $this->run_cp_case( 'Chargeable', 'Chargeable', 'Canceled', 'OneTime', true ) );
+		$this->assertSame( 0, $this->run_cp_case( 'Chargeable', 'Chargeable', 'Canceled', 'OneTime', 600 ) );
 	}
 
 	/**
-	 * OneTime Chargeable without a charge does not poll.
+	 * OneTime Chargeable without a charge re-checks once a week.
 	 *
 	 * @return void
 	 */
-	public function test_cp_chargeable_no_charge_does_not_poll() : void {
-		$this->assertSame( 0, $this->run_cp_case( 'Chargeable', null, null ) );
+	public function test_cp_chargeable_no_charge_rechecks_weekly() : void {
+		$this->assertSame( 1, $this->run_cp_case( 'Chargeable', null, null ) );
+		$this->assertEqualsWithDelta( time() + WEEK_IN_SECONDS, $this->next_poll_time( $this->last_cp_id, 'CHARGE_PERMISSION' ), 60 );
 	}
 
 	/**
@@ -385,7 +462,7 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 	 * @return void
 	 */
 	public function test_cp_nonchargeable_unchanged_captured_does_not_rearm() : void {
-		$this->assertSame( 0, $this->run_cp_case( 'NonChargeable', 'NonChargeable', 'Captured', 'OneTime', true ) );
+		$this->assertSame( 0, $this->run_cp_case( 'NonChargeable', 'NonChargeable', 'Captured', 'OneTime', 600 ) );
 	}
 
 	/**
@@ -449,6 +526,6 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 	 * @return void
 	 */
 	public function test_cp_recurring_closed_unschedules_prequeued() : void {
-		$this->assertSame( 0, $this->run_cp_case( 'Closed', 'Chargeable', 'Captured', 'Recurring', true ) );
+		$this->assertSame( 0, $this->run_cp_case( 'Closed', 'Chargeable', 'Captured', 'Recurring', 600 ) );
 	}
 }
