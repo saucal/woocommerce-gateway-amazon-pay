@@ -240,4 +240,215 @@ class WC_Gateway_Amazon_Payments_Advanced_Polling_Test extends WP_UnitTestCase {
 			'Canceled' => array( 'Canceled' ),
 		);
 	}
+
+	/**
+	 * Build a stub charge permission object.
+	 *
+	 * @param string $cp_id CP id.
+	 * @param string $state CP state.
+	 * @param string $type  CP type.
+	 *
+	 * @return object
+	 */
+	protected function make_charge_permission( $cp_id, $state, $type = 'OneTime' ) {
+		return (object) array(
+			'chargePermissionId'   => $cp_id,
+			'chargePermissionType' => $type,
+			'creationTimestamp'    => gmdate( 'Ymd\THis\Z' ),
+			'statusDetails'        => (object) array(
+				'state'   => $state,
+				'reasons' => array(),
+			),
+		);
+	}
+
+	/**
+	 * Count pending polls for a charge permission.
+	 *
+	 * @param string $cp_id CP id.
+	 *
+	 * @return int
+	 */
+	protected function count_cp_polls( $cp_id ) {
+		return count(
+			as_get_scheduled_actions(
+				array(
+					'hook'   => self::HOOK,
+					'args'   => array( $cp_id, 'CHARGE_PERMISSION' ),
+					'status' => ActionScheduler_Store::STATUS_PENDING,
+				),
+				'ids'
+			)
+		);
+	}
+
+	/**
+	 * Run log_charge_permission_status_change and return the pending CP poll count.
+	 *
+	 * @param string      $state         CP state.
+	 * @param string|null $cached_state  Cached CP state, null for none.
+	 * @param string|null $charge_status Cached charge state, null for no charge.
+	 * @param string      $type          CP type.
+	 * @param bool        $prequeue      Whether to pre-queue a CP poll.
+	 *
+	 * @return int
+	 */
+	protected function run_cp_case( $state, $cached_state, $charge_status, $type = 'OneTime', $prequeue = false ) {
+		self::$counter++;
+		$cp_id = 'P01-336-' . self::$counter . '-' . wp_generate_password( 6, false );
+
+		$order = WC_Helper_Order::create_order( 'amazon_payments_advanced' );
+		$order->update_meta_data( 'amazon_charge_permission_id', $cp_id );
+		if ( null !== $cached_state ) {
+			$order->update_meta_data(
+				'amazon_charge_permission_status',
+				wp_json_encode(
+					array(
+						'status'  => $cached_state,
+						'reasons' => array(),
+						'type'    => $type,
+					)
+				)
+			);
+		}
+		if ( null !== $charge_status ) {
+			$order->update_meta_data( 'amazon_charge_id', $cp_id . '-C1' );
+			$order->update_meta_data(
+				'amazon_charge_status',
+				wp_json_encode(
+					array(
+						'status'  => $charge_status,
+						'reasons' => array(),
+					)
+				)
+			);
+		}
+		$order->save();
+
+		if ( $prequeue ) {
+			as_schedule_single_action( time() + 600, self::HOOK, array( $cp_id, 'CHARGE_PERMISSION' ), self::HOOK );
+		}
+
+		$this->gateway->log_charge_permission_status_change( $order, $this->make_charge_permission( $cp_id, $state, $type ) );
+
+		return $this->count_cp_polls( $cp_id );
+	}
+
+	/**
+	 * OneTime Closed removes a pre-queued poll.
+	 *
+	 * @return void
+	 */
+	public function test_cp_closed_changed_unschedules_prequeued() : void {
+		$this->assertSame( 0, $this->run_cp_case( 'Closed', 'NonChargeable', 'Captured', 'OneTime', true ) );
+	}
+
+	/**
+	 * OneTime Chargeable, changed, does not poll.
+	 *
+	 * @return void
+	 */
+	public function test_cp_chargeable_changed_does_not_poll() : void {
+		$this->assertSame( 0, $this->run_cp_case( 'Chargeable', 'NonChargeable', 'Canceled' ) );
+	}
+
+	/**
+	 * OneTime Chargeable, unchanged, drains a pre-queued poll.
+	 *
+	 * @return void
+	 */
+	public function test_cp_chargeable_unchanged_unschedules_prequeued() : void {
+		$this->assertSame( 0, $this->run_cp_case( 'Chargeable', 'Chargeable', 'Canceled', 'OneTime', true ) );
+	}
+
+	/**
+	 * OneTime Chargeable without a charge does not poll.
+	 *
+	 * @return void
+	 */
+	public function test_cp_chargeable_no_charge_does_not_poll() : void {
+		$this->assertSame( 0, $this->run_cp_case( 'Chargeable', null, null ) );
+	}
+
+	/**
+	 * OneTime NonChargeable, changed, with a captured charge polls once.
+	 *
+	 * @return void
+	 */
+	public function test_cp_nonchargeable_changed_captured_polls_once() : void {
+		$this->assertSame( 1, $this->run_cp_case( 'NonChargeable', null, 'Captured' ) );
+	}
+
+	/**
+	 * OneTime NonChargeable, unchanged, with a captured charge does not re-arm.
+	 *
+	 * @return void
+	 */
+	public function test_cp_nonchargeable_unchanged_captured_does_not_rearm() : void {
+		$this->assertSame( 0, $this->run_cp_case( 'NonChargeable', 'NonChargeable', 'Captured', 'OneTime', true ) );
+	}
+
+	/**
+	 * OneTime NonChargeable, changed, without a captured charge does not poll.
+	 *
+	 * @dataProvider uncaptured_charge_states
+	 *
+	 * @param string|null $charge_status Cached charge state.
+	 *
+	 * @return void
+	 */
+	public function test_cp_nonchargeable_changed_uncaptured_does_not_poll( $charge_status ) : void {
+		$this->assertSame( 0, $this->run_cp_case( 'NonChargeable', null, $charge_status ) );
+	}
+
+	/**
+	 * Charge states other than Captured.
+	 *
+	 * @return array
+	 */
+	public function uncaptured_charge_states() {
+		return array(
+			'Authorized' => array( 'Authorized' ),
+			'Declined'   => array( 'Declined' ),
+			'Canceled'   => array( 'Canceled' ),
+			'No charge'  => array( null ),
+		);
+	}
+
+	/**
+	 * Recurring Chargeable and NonChargeable keep polling in both branches.
+	 *
+	 * @dataProvider recurring_polling_cases
+	 *
+	 * @param string      $state        CP state.
+	 * @param string|null $cached_state Cached CP state, null for none.
+	 *
+	 * @return void
+	 */
+	public function test_cp_recurring_polls( $state, $cached_state ) : void {
+		$this->assertSame( 1, $this->run_cp_case( $state, $cached_state, null, 'Recurring' ) );
+	}
+
+	/**
+	 * Recurring CP states that keep polling.
+	 *
+	 * @return array
+	 */
+	public function recurring_polling_cases() {
+		return array(
+			'Chargeable unchanged'    => array( 'Chargeable', 'Chargeable' ),
+			'Chargeable changed'      => array( 'Chargeable', null ),
+			'NonChargeable unchanged' => array( 'NonChargeable', 'NonChargeable' ),
+			'NonChargeable changed'   => array( 'NonChargeable', null ),
+		);
+	}
+
+	/**
+	 * Recurring Closed removes a pre-queued poll.
+	 *
+	 * @return void
+	 */
+	public function test_cp_recurring_closed_unschedules_prequeued() : void {
+		$this->assertSame( 0, $this->run_cp_case( 'Closed', 'Chargeable', 'Captured', 'Recurring', true ) );
+	}
 }

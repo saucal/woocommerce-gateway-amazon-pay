@@ -1902,6 +1902,23 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 	}
 
 	/**
+	 * Check whether a charge permission poll should be scheduled.
+	 *
+	 * @param WC_Order $order             Order object.
+	 * @param object   $charge_permission Charge permission object from the Amazon API.
+	 * @param bool     $status_changed    Whether the state differs from the cached one.
+	 *
+	 * @return bool
+	 */
+	protected function charge_permission_needs_polling( $order, $charge_permission, $status_changed ) {
+		$state = $charge_permission->statusDetails->state; // phpcs:ignore WordPress.NamingConventions
+		if ( 'OneTime' !== $charge_permission->chargePermissionType ) { // phpcs:ignore WordPress.NamingConventions
+			return in_array( $state, array( 'Chargeable', 'NonChargeable' ), true );
+		}
+		return $status_changed && 'NonChargeable' === $state && 'Captured' === $this->get_cached_charge_status( $order, true )->status;
+	}
+
+	/**
 	 * Log a change to the charge permission status stored in an order.
 	 *
 	 * @param  WC_Order           $order Order object.
@@ -1939,16 +1956,18 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			}
 			$charge_permission = WC_Amazon_Payments_Advanced_API::get_charge_permission( $charge_permission_id );
 		}
+		if ( is_wp_error( $charge_permission ) ) {
+			return null;
+		}
 		$order->read_meta_data( true ); // Force read from db to avoid concurrent notifications.
 		$old_status               = $this->get_cached_charge_permission_status( $order, true )->status;
 		$charge_permission_status = $charge_permission->statusDetails->state; // phpcs:ignore WordPress.NamingConventions
+		if ( $this->charge_permission_needs_polling( $order, $charge_permission, $charge_permission_status !== $old_status ) ) {
+			wc_apa()->ipn_handler->schedule_hook( $charge_permission_id, 'CHARGE_PERMISSION', $order );
+		} else {
+			wc_apa()->ipn_handler->unschedule_hook( $charge_permission_id, 'CHARGE_PERMISSION' );
+		}
 		if ( $charge_permission_status === $old_status ) {
-			switch ( $charge_permission_status ) {
-				case 'Chargeable':
-				case 'NonChargeable':
-					wc_apa()->ipn_handler->schedule_hook( $charge_permission_id, 'CHARGE_PERMISSION', $order );
-					break;
-			}
 			return $old_status;
 		}
 		$this->refresh_cached_charge_permission_status( $order, $charge_permission );
@@ -1959,10 +1978,6 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		$this->add_status_change_note( $order, (string) $charge_permission_id, (string) $charge_permission_status );
 
 		switch ( $charge_permission_status ) {
-			case 'Chargeable':
-			case 'NonChargeable':
-				wc_apa()->ipn_handler->schedule_hook( $charge_permission_id, 'CHARGE_PERMISSION', $order );
-				break;
 			case 'Closed':
 				$order_has_charge = is_null( $this->get_cached_charge_status( $order, true )->status );
 				if ( apply_filters( 'woocommerce_amazon_pa_charge_permission_status_should_fail_order', $order_has_charge, $order ) ) {
