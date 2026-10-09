@@ -47,6 +47,7 @@ function _manually_load_plugin() {
 	require_once __DIR__ . '/mockers/class-wc-mocker-gateway-amazon-payments-advanced.php';
 	require_once __DIR__ . '/mockers/class-wc-mocker-amazon-payments-advanced-api.php';
 	require_once __DIR__ . '/mockers/class-wc-mocker-amazon-pay-fake-client.php';
+	require_once __DIR__ . '/mockers/class-wc-mocker-amazon-pay-sdk-client.php';
 }
 
 tests_add_filter( 'muplugins_loaded', '_manually_load_plugin' );

@@ -1945,6 +1945,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			$charge = WC_Amazon_Payments_Advanced_API::get_charge( $charge_id );
 		}
 		if ( is_wp_error( $charge ) ) {
+			wc_apa()->log( sprintf( 'Could not read charge "%1$s" for #%2$d: %3$s', $charge_id, $order->get_id(), $charge->get_error_message() ) );
 			return null;
 		}
 		$order->read_meta_data( true ); // Force read from db to avoid concurrent notifications.
@@ -2066,6 +2067,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			$charge_permission = WC_Amazon_Payments_Advanced_API::get_charge_permission( $charge_permission_id );
 		}
 		if ( is_wp_error( $charge_permission ) ) {
+			wc_apa()->log( sprintf( 'Could not read charge permission "%1$s" for #%2$d: %3$s', $charge_permission_id, $order->get_id(), $charge_permission->get_error_message() ) );
 			return null;
 		}
 		$order->read_meta_data( true ); // Force read from db to avoid concurrent notifications.
@@ -2687,6 +2689,37 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 	}
 
 	/**
+	 * Reconcile the charge status with Amazon.
+	 *
+	 * @param  WC_Order $order       Order object.
+	 * @param  string   $charge_id   Charge ID.
+	 * @param  array    $done_states Charge states in which the action needs no API call.
+	 * @param  string   $note        Note to add to the order.
+	 *
+	 * @return object|false The live charge if the order was reconciled, false otherwise.
+	 */
+	protected function reconcile_charge_status( $order, $charge_id, array $done_states, $note ) {
+		$charge = WC_Amazon_Payments_Advanced_API::get_charge( $charge_id );
+
+		if ( is_wp_error( $charge ) ) {
+			return false;
+		}
+
+		$state = $charge->statusDetails->state; // phpcs:ignore WordPress.NamingConventions
+
+		if ( ! in_array( $state, $done_states, true ) ) {
+			return false;
+		}
+
+		$order->add_order_note( sprintf( $note, (string) $charge_id, (string) $state ) );
+
+		wc_apa()->get_gateway()->log_charge_permission_status_change( $order );
+		wc_apa()->get_gateway()->log_charge_status_change( $order, $charge );
+
+		return $charge;
+	}
+
+	/**
 	 * Perform an authorization on an order.
 	 *
 	 * @param  WC_Order $order Order object.
@@ -2731,6 +2764,8 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		);
 
 		if ( is_wp_error( $charge ) ) {
+			wc_apa()->get_gateway()->log_charge_permission_status_change( $order );
+			wc_apa()->get_gateway()->log_charge_status_change( $order );
 			return $charge;
 		}
 
@@ -2761,9 +2796,22 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			return new WP_Error( 'no_charge', 'The specified order doesn\'t have a charge' );
 		}
 
+		$reconciled = $this->reconcile_charge_status(
+			$order,
+			$id,
+			array( 'Captured', 'CaptureInitiated', 'Canceled', 'Declined' ),
+			/* translators: 1) Amazon Charge ID 2) Charge status on Amazon */
+			__( 'Authorization %1$s was already %2$s on Amazon.', 'woocommerce-gateway-amazon-payments-advanced' )
+		);
+
+		if ( false !== $reconciled ) {
+			return $reconciled;
+		}
+
 		$charge = WC_Amazon_Payments_Advanced_API::cancel_charge( $id );
 
 		if ( is_wp_error( $charge ) ) {
+			wc_apa()->get_gateway()->log_charge_status_change( $order );
 			return $charge;
 		}
 
@@ -2794,9 +2842,22 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			return new WP_Error( 'no_charge', 'The specified order doesn\'t have a charge' );
 		}
 
+		$reconciled = $this->reconcile_charge_status(
+			$order,
+			$id,
+			array( 'Captured', 'CaptureInitiated' ),
+			/* translators: 1) Amazon Charge ID 2) Charge status on Amazon */
+			__( 'Charge %1$s was already %2$s on Amazon.', 'woocommerce-gateway-amazon-payments-advanced' )
+		);
+
+		if ( false !== $reconciled ) {
+			return $reconciled;
+		}
+
 		$charge = WC_Amazon_Payments_Advanced_API::capture_charge( $id );
 
 		if ( is_wp_error( $charge ) ) {
+			wc_apa()->get_gateway()->log_charge_status_change( $order );
 			return $charge;
 		}
 
@@ -2831,6 +2892,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		$refund = WC_Amazon_Payments_Advanced_API::refund_charge( $id, $amount );
 
 		if ( is_wp_error( $refund ) ) {
+			wc_apa()->get_gateway()->log_charge_status_change( $order );
 			return $refund;
 		}
 
