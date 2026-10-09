@@ -229,4 +229,69 @@ class WC_Amazon_Payments_Advanced_IPN_Handler_Test extends WP_UnitTestCase {
 		$this->assertSame( $amazon_notes + 1, $this->note_count( $amazon_order->get_id() ), 'The note must land on the order Amazon confirmed.' );
 		$this->assertSame( $spoofed_notes, $this->note_count( $spoofed_target->get_id() ), 'The spoofed target order must be untouched.' );
 	}
+
+	/**
+	 * A forged v1 refund dispatched to every IPN handler never refunds or cancels an order.
+	 *
+	 * @return void
+	 */
+	public function test_forged_v1_refund_is_stopped_before_the_legacy_handler() : void {
+		$order = WC_Helper_Order::create_order( 'bacs' );
+		$order->set_status( 'processing' );
+		$order->save();
+
+		$client = new ReflectionProperty( WC_Amazon_Payments_Advanced_API::class, 'amazonpay_client' );
+		$client->setAccessible( true );
+		$original = $client->getValue();
+		$client->setValue( null, new WC_Mocker_Amazon_Pay_Fake_Client() );
+		set_error_handler( array( self::class, 'ignore_warning' ), E_WARNING ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler
+
+		$aborted = false;
+		try {
+			do_action( 'woocommerce_amazon_payments_advanced_handle_ipn', $this->get_refund_message( $order->get_id() ) );
+		} catch ( Exception $e ) {
+			$aborted = true;
+		} finally {
+			restore_error_handler();
+			$client->setValue( null, $original );
+		}
+
+		$order = wc_get_order( $order->get_id() );
+		$this->assertTrue( $aborted );
+		$this->assertSame( 0.0, (float) $order->get_total_refunded() );
+		$this->assertSame( 'processing', $order->get_status() );
+	}
+
+	/**
+	 * Build a parsed v1 PaymentRefund notification aimed at an order.
+	 *
+	 * @param int $order_id Targeted order ID.
+	 *
+	 * @return array
+	 */
+	private function get_refund_message( int $order_id ) : array {
+		return array(
+			'Type'    => 'Notification',
+			'Message' => array(
+				'NotificationType' => 'PaymentRefund',
+				'NotificationData' => '<RefundNotification><RefundDetails>'
+					. '<AmazonRefundId>S01-0000000-0000000-R000000</AmazonRefundId>'
+					. '<RefundReferenceId>' . $order_id . '-1</RefundReferenceId>'
+					. '<RefundType>BuyerCanceled</RefundType>'
+					. '<RefundAmount><Amount>10.00</Amount><CurrencyCode>USD</CurrencyCode></RefundAmount>'
+					. '<RefundStatus><State>Completed</State></RefundStatus>'
+					. '<SellerRefundNote>Forged</SellerRefundNote>'
+					. '</RefundDetails></RefundNotification>',
+			),
+		);
+	}
+
+	/**
+	 * Swallow a PHP warning.
+	 *
+	 * @return bool
+	 */
+	public static function ignore_warning() : bool {
+		return true;
+	}
 }

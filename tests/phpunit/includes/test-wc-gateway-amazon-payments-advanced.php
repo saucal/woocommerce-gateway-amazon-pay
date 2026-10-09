@@ -464,6 +464,22 @@ class WC_Gateway_Amazon_Payments_Advanced_Test extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Test amazon_login rejects a checkout session ID Amazon cannot find.
+	 *
+	 * @return void
+	 */
+	public function test_amazon_login_rejects_unknown_session_id() : void {
+		WC()->session->set( 'amazon_nonce', 'VISITOR_NONCE' );
+		WC_Mocker_Gateway_Amazon_Payments_Advanced::$session_error = new WP_Error( 'ResourceNotFound', 'Checkout session not found.' );
+
+		try {
+			$this->assertFalse( $this->is_valid_login_return() );
+		} finally {
+			WC_Mocker_Gateway_Amazon_Payments_Advanced::$session_error = null;
+		}
+	}
+
+	/**
 	 * Test a logged-in link without the account password is refused.
 	 *
 	 * @return void

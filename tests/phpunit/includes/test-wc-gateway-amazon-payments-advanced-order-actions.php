@@ -193,6 +193,76 @@ class WC_Gateway_Amazon_Payments_Advanced_Order_Actions_Test extends WP_UnitTest
 	}
 
 	/**
+	 * Charge states Close Authorization treats as already closed on Amazon.
+	 *
+	 * @return array
+	 */
+	public function closed_charge_states() : array {
+		return array(
+			'canceled' => array( 'Canceled' ),
+			'declined' => array( 'Declined' ),
+		);
+	}
+
+	/**
+	 * Close Authorization on a charge Amazon already closed syncs without cancelling again.
+	 *
+	 * @dataProvider closed_charge_states
+	 *
+	 * @param  string $state Charge state on Amazon.
+	 * @return void
+	 */
+	public function test_cancel_auth_reconciles_when_amazon_already_closed( string $state ) : void {
+		$order = $this->create_authorized_order();
+
+		$this->client->charge_state    = $state;
+		$this->client->mutation_status = 422;
+
+		$result = self::$gateway->perform_cancel_auth( $order, self::CHARGE_ID );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( 0, $this->client->call_count( 'cancelCharge' ) );
+
+		$order = wc_get_order( $order->get_id() );
+		$this->assertFalse( $order->is_paid() );
+		$this->assertSame( $state, $this->cached_charge_state( $order ) );
+		$this->assertTrue( $this->has_note( $order, "was already $state on Amazon" ) );
+	}
+
+	/**
+	 * A reconciled capture leaves no charge check scheduled.
+	 *
+	 * @return void
+	 */
+	public function test_capture_reconcile_leaves_no_charge_check_pending() : void {
+		$order = $this->create_authorized_order();
+		$args  = array( self::CHARGE_ID, 'CHARGE' );
+		$this->assertNotFalse( as_next_scheduled_action( 'wc_amazon_async_polling', $args, 'wc_amazon_async_polling' ) );
+
+		$this->client->charge_state = 'Captured';
+		self::$gateway->perform_capture( $order, self::CHARGE_ID );
+
+		$this->assertFalse( as_next_scheduled_action( 'wc_amazon_async_polling', $args, 'wc_amazon_async_polling' ) );
+	}
+
+	/**
+	 * A failed order action leaves an order note with Amazon's error.
+	 *
+	 * @return void
+	 */
+	public function test_failed_order_action_adds_order_note() : void {
+		require_once wc_apa()->path . '/includes/admin/class-wc-amazon-payments-advanced-order-admin.php';
+		$order = $this->create_authorized_order();
+
+		$this->client->mutation_status = 503;
+		$this->client->mutation_reason = 'InternalServerError';
+
+		( new WC_Amazon_Payments_Advanced_Order_Admin() )->do_order_action( $order, self::CHARGE_ID, 'capture', 'v2' );
+
+		$this->assertTrue( $this->has_note( wc_get_order( $order->get_id() ), 'Amazon Pay action "capture" failed' ) );
+	}
+
+	/**
 	 * Replace the gateway returned by wc_apa()->get_gateway().
 	 *
 	 * @param  mixed $gateway Gateway to install.
