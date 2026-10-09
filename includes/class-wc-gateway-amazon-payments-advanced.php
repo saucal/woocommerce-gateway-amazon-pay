@@ -214,8 +214,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		add_action( 'woocommerce_subscriptions_change_payment_after_submit', array( $this, 'classic_integration_button' ) );
 
 		// Cart.
-		add_action( 'woocommerce_proceed_to_checkout', array( $this, 'display_amazon_pay_button_separator_html' ), 20 );
-		add_action( 'woocommerce_proceed_to_checkout', array( $this, 'checkout_button' ), 25 );
+		add_action( 'woocommerce_proceed_to_checkout', array( $this, 'maybe_render_button_and_separator' ), 25 );
 		if ( $this->doing_ajax() ) {
 			add_action( 'woocommerce_review_order_before_order_total', array( $this, 'update_js' ) );
 		}
@@ -630,7 +629,9 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 	 * @return void
 	 */
 	public function maybe_separator_and_checkout_button() {
-		if ( $this->is_available() && $this->possible_subscription_cart_supported() && $this->is_mini_cart_button_enabled() && ! $this->is_hide_button_mode_enabled() && WC()->cart->get_cart_contents_count() > 0 ) {
+		$cart_contains_sub = class_exists( 'WC_Subscriptions_Cart' ) ? WC_Subscriptions_Cart::cart_contains_subscription() : false;
+
+		if ( $this->is_available() && $this->possible_subscription_cart_supported() && $this->is_mini_cart_button_enabled() && ! $this->is_hide_button_mode_enabled() && WC()->cart->get_cart_contents_count() > 0 && ( $cart_contains_sub || WC()->cart->needs_payment() ) ) {
 			?>
 			<div class="woocommerce-mini-cart__buttons buttons">
 				<?php
@@ -641,6 +642,20 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			</div>
 			<?php
 		}
+	}
+
+	/**
+	 * Maybe render separator and Amazon Pay button.
+	 *
+	 * @return void
+	 */
+	public function maybe_render_button_and_separator() {
+		if ( ! WC()->cart->needs_payment() ) {
+			return;
+		}
+
+		$this->display_amazon_pay_button_separator_html();
+		$this->checkout_button();
 	}
 
 	/**
@@ -666,15 +681,16 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 	 * Checkout Message
 	 */
 	public function checkout_message() {
-		$class = array( 'wc-amazon-checkout-message' );
-		if ( $this->is_available() ) {
+		$populated = $this->has_checkout_message();
+		$class     = array( 'wc-amazon-checkout-message' );
+		if ( $populated ) {
 			$class[] = 'wc-amazon-payments-advanced-populated';
 		}
 		$class = implode( ' ', $class );
 		?>
 		<div class="<?php echo esc_attr( $class ); ?>" >
 		<?php
-		if ( $this->is_available() ) {
+		if ( $populated ) {
 			if ( ! $this->is_logged_in() ) {
 				?>
 				<div class="woocommerce-info info wc-amazon-payments-advanced-info"><?php echo wp_kses_post( $this->checkout_button( false ) . ' ' . apply_filters( 'woocommerce_amazon_pa_checkout_message', __( 'Have an Amazon account?', 'woocommerce-gateway-amazon-payments-advanced' ) ) ); ?></div>
@@ -687,6 +703,15 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Whether the checkout message has a button or logout notice to show.
+	 *
+	 * @return bool
+	 */
+	protected function has_checkout_message() {
+		return $this->is_available() && ( $this->is_logged_in() || is_checkout_pay_page() || WC()->cart->needs_payment() );
 	}
 
 	/**
@@ -2775,7 +2800,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		ob_start();
 		$this->checkout_message();
 		$ret = ob_get_clean();
-		if ( $this->is_available() ) {
+		if ( $this->has_checkout_message() ) {
 			$fragments['.wc-amazon-checkout-message:not(.wc-amazon-payments-advanced-populated)'] = $ret;
 		} else {
 			$fragments['.wc-amazon-checkout-message.wc-amazon-payments-advanced-populated'] = $ret;
