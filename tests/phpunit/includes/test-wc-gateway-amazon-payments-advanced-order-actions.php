@@ -43,8 +43,9 @@ class WC_Gateway_Amazon_Payments_Advanced_Order_Actions_Test extends WP_UnitTest
 	 */
 	public static function set_up_before_class() : void {
 		parent::set_up_before_class();
-		self::$gateway          = new WC_Gateway_Amazon_Payments_Advanced();
-		self::$original_gateway = self::swap_plugin_gateway( self::$gateway );
+		self::$gateway                              = new WC_Gateway_Amazon_Payments_Advanced();
+		self::$gateway->settings['payment_capture'] = '';
+		self::$original_gateway                     = self::swap_plugin_gateway( self::$gateway );
 		update_option( 'woocommerce_currency', 'EUR' );
 		update_option( 'woocommerce_amazon_payments_new_install', WC_AMAZON_PAY_VERSION );
 		update_option( 'amazon_api_version', 'V2' );
