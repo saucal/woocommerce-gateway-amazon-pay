@@ -1787,6 +1787,24 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 
 
 	/**
+	 * Check whether a charge in this state still expects a transition from Amazon.
+	 *
+	 * @param string $state Charge state.
+	 *
+	 * @return bool
+	 */
+	protected function charge_needs_polling( $state ) {
+		switch ( $state ) {
+			case 'AuthorizationInitiated':
+			case 'CaptureInitiated':
+				return true;
+			case 'Authorized':
+				return ! in_array( $this->settings['payment_capture'], array( 'authorize', 'manual' ), true );
+		}
+		return false;
+	}
+
+	/**
 	 * Log a change to the charge status stored in an order.
 	 *
 	 * @param  WC_Order           $order Order object.
@@ -1822,17 +1840,18 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			}
 			$charge = WC_Amazon_Payments_Advanced_API::get_charge( $charge_id );
 		}
+		if ( is_wp_error( $charge ) ) {
+			return null;
+		}
 		$order->read_meta_data( true ); // Force read from db to avoid concurrent notifications.
 		$old_status    = $this->get_cached_charge_status( $order, true )->status;
 		$charge_status = $charge->statusDetails->state; // phpcs:ignore WordPress.NamingConventions
+		if ( $this->charge_needs_polling( $charge_status ) ) {
+			wc_apa()->ipn_handler->schedule_hook( $charge_id, 'CHARGE' );
+		} else {
+			wc_apa()->ipn_handler->unschedule_hook( $charge_id, 'CHARGE' );
+		}
 		if ( $charge_status === $old_status ) {
-			switch ( $old_status ) {
-				case 'AuthorizationInitiated':
-				case 'Authorized':
-				case 'CaptureInitiated':
-					wc_apa()->ipn_handler->schedule_hook( $charge_id, 'CHARGE' );
-					break;
-			}
 			return $old_status;
 		}
 		$this->refresh_cached_charge_status( $order, $charge );
@@ -1858,7 +1877,6 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 				// Mark as on-hold.
 				$order->update_status( 'on-hold' );
 				wc_maybe_reduce_stock_levels( $order->get_id() );
-				wc_apa()->ipn_handler->schedule_hook( $charge_id, 'CHARGE' );
 				break;
 			case 'Canceled':
 				if ( 'cancelled' !== $order->get_status() ) {
