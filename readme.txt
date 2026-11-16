@@ -3,7 +3,7 @@ Contributors: amazonpay, woocommerce, automattic, saucal, woothemes, akeda, jeff
 Tags: woocommerce, amazon, checkout, payments, e-commerce, ecommerce
 Requires at least: 5.5
 Tested up to: 7.1.3
-Stable tag: 2.6.3
+Stable tag: 2.6.4
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -79,6 +79,10 @@ WordPress codex contains [instructions on how to do this here](http://codex.word
 Automatic updates should work like a charm; as always though, ensure you backup your site just in case.
 
 == Changelog ==
+
+= 2.6.4 - 2026-10-29 =
+
+* Fix - Harden return callback for Classic Checkout.
 
 = 2.6.3 - 2026-10-26 =
 
