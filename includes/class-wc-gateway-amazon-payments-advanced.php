@@ -2093,6 +2093,9 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 		}
 
 		if ( ! is_wp_error( $charge ) ) {
+			if ( 'Closed' !== $this->get_cached_charge_permission_status( $order, true )->status ) {
+				wc_apa()->ipn_handler->schedule_hook( WC_Amazon_Payments_Advanced::get_order_charge_permission( $order->get_id() ), 'CHARGE_PERMISSION', $order, strtotime( '+1 minute' ) );
+			}
 			return;
 		}
 

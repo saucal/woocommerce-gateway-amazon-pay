@@ -20,6 +20,13 @@ class WC_Mocker_Amazon_Pay_Sdk_Client {
 	public $charge_state = 'Authorized';
 
 	/**
+	 * State reported by getChargePermission.
+	 *
+	 * @var string
+	 */
+	public $permission_state = 'Chargeable';
+
+	/**
 	 * HTTP status returned by the mutating endpoints.
 	 *
 	 * @var int
@@ -182,7 +189,7 @@ class WC_Mocker_Amazon_Pay_Sdk_Client {
 					'chargePermissionType' => 'OneTime',
 					'creationTimestamp'    => '2026-01-01T09:59:00Z',
 					'statusDetails'        => array(
-						'state'   => 'Chargeable',
+						'state'   => $this->permission_state,
 						'reasons' => array(),
 					),
 				)

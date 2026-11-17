@@ -116,6 +116,40 @@ class WC_Gateway_Amazon_Payments_Advanced_Order_Actions_Test extends WP_UnitTest
 	}
 
 	/**
+	 * An automatic capture schedules a charge permission refresh within a minute.
+	 *
+	 * @return void
+	 */
+	public function test_automatic_capture_schedules_charge_permission_refresh() : void {
+		$this->set_capture_settings( 'authorize', 'async', 'yes' );
+		$order = $this->create_authorized_order( 'AuthorizationInitiated' );
+
+		$this->client->charge_state = 'Authorized';
+		self::$gateway->log_charge_status_change( $order, self::CHARGE_ID );
+
+		$next = as_next_scheduled_action( 'wc_amazon_async_polling', array( self::CHARGE_PERMISSION_ID, 'CHARGE_PERMISSION' ), 'wc_amazon_async_polling' );
+		$this->assertIsInt( $next );
+		$this->assertLessThanOrEqual( strtotime( '+1 minute' ), $next );
+	}
+
+	/**
+	 * An automatic capture skips the charge permission refresh when Amazon already closed it.
+	 *
+	 * @return void
+	 */
+	public function test_automatic_capture_skips_refresh_of_closed_charge_permission() : void {
+		$this->set_capture_settings( 'authorize', 'async', 'yes' );
+		$order = $this->create_authorized_order( 'AuthorizationInitiated' );
+
+		$this->client->charge_state     = 'Authorized';
+		$this->client->permission_state = 'Closed';
+		self::$gateway->log_charge_status_change( $order, self::CHARGE_ID );
+
+		$this->assertSame( 1, $this->client->call_count( 'captureCharge' ) );
+		$this->assertFalse( as_next_scheduled_action( 'wc_amazon_async_polling', array( self::CHARGE_PERMISSION_ID, 'CHARGE_PERMISSION' ), 'wc_amazon_async_polling' ) );
+	}
+
+	/**
 	 * Settings saved before the option existed leave automatic capture off.
 	 *
 	 * @return void
