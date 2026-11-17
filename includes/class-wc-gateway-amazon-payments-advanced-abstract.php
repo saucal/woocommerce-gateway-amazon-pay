@@ -502,6 +502,14 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 					'async' => __( 'Asynchronous', 'woocommerce-gateway-amazon-payments-advanced' ),
 				),
 			),
+			'automatic_capture'           => array(
+				'title'       => __( 'Enable Automatic Capture', 'woocommerce-gateway-amazon-payments-advanced' ),
+				'label'       => __( 'Capture the funds automatically after the order is Authorized.', 'woocommerce-gateway-amazon-payments-advanced' ),
+				'type'        => 'checkbox',
+				'description' => __( 'When Amazon confirms an asynchronous authorization, the payment is captured without manual action. If the capture request returns an error, it is retried hourly and an admin notice links to the order.', 'woocommerce-gateway-amazon-payments-advanced' ),
+				'desc_tip'    => true,
+				'default'     => 'no',
+			),
 			'display_options'             => array(
 				'title'       => __( 'Display options', 'woocommerce-gateway-amazon-payments-advanced' ),
 				'description' => __( 'Customize the appearance of Amazon widgets.', 'woocommerce-gateway-amazon-payments-advanced' ),
@@ -614,6 +622,10 @@ abstract class WC_Gateway_Amazon_Payments_Advanced_Abstract extends WC_Payment_G
 		 */
 		if ( WC_Amazon_Payments_Advanced_API::is_new_installation() ) {
 			unset( $this->form_fields['enable_login_app'] );
+		}
+
+		if ( ! WC_Amazon_Payments_Advanced_Merchant_Onboarding_Handler::get_migration_status() ) {
+			unset( $this->form_fields['automatic_capture'] );
 		}
 
 		$this->form_fields = apply_filters( 'woocommerce_amazon_pa_form_fields_before_legacy', $this->form_fields );

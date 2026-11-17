@@ -11,6 +11,13 @@
 class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Advanced_Abstract {
 
 	/**
+	 * Order meta key flagging a failed automatic capture.
+	 *
+	 * @var string
+	 */
+	const AUTOMATIC_CAPTURE_FAILED = 'amazon_automatic_capture_failed';
+
+	/**
 	 * Cached object for the checkout session
 	 *
 	 * @var object
@@ -1947,7 +1954,8 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 	 * @param  null|string|object $charge Optional. Can be the charge_id, or the charge object from the amazon API.
 	 */
 	public function log_charge_status_change( $order, $charge = null ) {
-		$charge_id = WC_Amazon_Payments_Advanced::get_order_charge_id( $order->get_id() );
+		$charge_id   = WC_Amazon_Payments_Advanced::get_order_charge_id( $order->get_id() );
+		$charge_sent = ! is_null( $charge );
 		// TODO: Maybe support multple charges to be tracked?
 		if ( ! is_null( $charge ) ) {
 			if ( is_string( $charge ) ) {
@@ -1981,6 +1989,7 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			return null;
 		}
 		$order->read_meta_data( true ); // Force read from db to avoid concurrent notifications.
+		$awaiting      = $order->has_status( array( 'pending', 'on-hold' ) );
 		$old_status    = $this->get_cached_charge_status( $order, true )->status;
 		$charge_status = $charge->statusDetails->state; // phpcs:ignore WordPress.NamingConventions
 		$poll_time     = $this->charge_poll_time( $charge );
@@ -1990,6 +1999,9 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 			wc_apa()->ipn_handler->unschedule_hook( $charge_id, 'CHARGE' );
 		}
 		if ( $charge_status === $old_status ) {
+			if ( $charge_sent ) {
+				$this->maybe_capture_automatically( $order, $charge_id, $charge_status, false, $awaiting );
+			}
 			return $old_status;
 		}
 		$this->refresh_cached_charge_status( $order, $charge );
@@ -2036,7 +2048,73 @@ class WC_Gateway_Amazon_Payments_Advanced extends WC_Gateway_Amazon_Payments_Adv
 
 		$order->save();
 
+		$this->maybe_capture_automatically( $order, $charge_id, $charge_status, true, $awaiting );
+
 		return $charge_status;
+	}
+
+	/**
+	 * Returns if automatic capture is enabled for Authorize + Asynchronous authorization.
+	 *
+	 * @return boolean
+	 */
+	protected function is_automatic_capture_enabled() {
+		return 'yes' === $this->get_option( 'automatic_capture' ) && 'authorize' === $this->settings['payment_capture'] && 'async' === $this->settings['authorization_mode'];
+	}
+
+	/**
+	 * Capture an authorized charge if automatic capture applies to it.
+	 *
+	 * @param WC_Order $order          Order object.
+	 * @param string   $charge_id      Charge ID.
+	 * @param string   $charge_status  Charge state on Amazon.
+	 * @param bool     $status_changed Whether the state differs from the cached one.
+	 * @param bool     $awaiting       Whether the order was pending or on hold before this update.
+	 */
+	protected function maybe_capture_automatically( $order, $charge_id, $charge_status, $status_changed, $awaiting ) {
+		$flag            = $order->get_meta( self::AUTOMATIC_CAPTURE_FAILED );
+		$retry           = (bool) $flag;
+		$can_be_captured = 'Authorized' === $charge_status && $awaiting;
+		$is_eligible     = $can_be_captured && ( $status_changed || $retry ) && $this->is_automatic_capture_enabled();
+
+		if ( $retry && ( $is_eligible || ! $can_be_captured ) ) {
+			$order->delete_meta_data( self::AUTOMATIC_CAPTURE_FAILED );
+			$order->save();
+		}
+
+		if ( ! $is_eligible ) {
+			return;
+		}
+
+		try {
+			$charge = $this->perform_capture( $order, $charge_id );
+		} catch ( Exception $e ) {
+			$charge = new WP_Error( 'amazon_capture_exception', $e->getMessage() );
+		}
+
+		if ( ! is_wp_error( $charge ) ) {
+			return;
+		}
+
+		if ( ! $retry ) {
+			$order->add_order_note(
+				sprintf(
+					/* translators: 1) Amazon Charge ID 2) Error message from Amazon */
+					__( 'Automatic capture of charge %1$s failed: %2$s', 'woocommerce-gateway-amazon-payments-advanced' ),
+					(string) $charge_id,
+					$charge->get_error_message()
+				)
+			);
+		}
+
+		if ( 'Authorized' !== $this->get_cached_charge_status( $order, true )->status ) {
+			return;
+		}
+
+		$order->update_meta_data( self::AUTOMATIC_CAPTURE_FAILED, $retry ? $flag : 'yes' );
+		$order->save();
+
+		wc_apa()->ipn_handler->schedule_hook( $charge_id, 'CHARGE', null, strtotime( '+1 hour' ) );
 	}
 
 	/**

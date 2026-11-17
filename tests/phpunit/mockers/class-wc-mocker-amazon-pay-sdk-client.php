@@ -41,6 +41,13 @@ class WC_Mocker_Amazon_Pay_Sdk_Client {
 	public $mutation_reason = 'InvalidChargeStatus';
 
 	/**
+	 * Message of the exception captureCharge throws, empty to answer normally.
+	 *
+	 * @var string
+	 */
+	public $capture_exception = '';
+
+	/**
 	 * Names of the endpoints that were called, in order.
 	 *
 	 * @var array
@@ -193,6 +200,10 @@ class WC_Mocker_Amazon_Pay_Sdk_Client {
 	 */
 	public function captureCharge( $charge_id, $data, $headers = null ) : array { // phpcs:ignore WordPress.NamingConventions
 		$this->calls[] = 'captureCharge';
+
+		if ( $this->capture_exception ) {
+			throw new Exception( $this->capture_exception );
+		}
 
 		if ( 200 !== $this->mutation_status ) {
 			return $this->mutation_failure();

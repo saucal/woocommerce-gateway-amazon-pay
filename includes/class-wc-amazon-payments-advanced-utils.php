@@ -47,6 +47,22 @@ class WC_Amazon_Payments_Advanced_Utils {
 	}
 
 	/**
+	 * Returns the order ID from the edit order screen's query string.
+	 *
+	 * @return int
+	 */
+	public static function get_edit_order_id() {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$order_id = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
+		if ( ! $order_id ) {
+			$order_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : 0;
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		return $order_id;
+	}
+
+	/**
 	 * Get non required fields.
 	 *
 	 * @return array
