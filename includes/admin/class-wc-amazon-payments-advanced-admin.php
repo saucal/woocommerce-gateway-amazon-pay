@@ -48,6 +48,7 @@ class WC_Amazon_Payments_Advanced_Admin {
 		add_action( 'admin_notices', array( $this, 'review_prompt' ) );
 		add_action( 'wp_ajax_amazon_pay_dismiss_notice', array( $this, 'ajax_dismiss_notice' ) );
 		add_action( 'wp_ajax_amazon_pay_dismiss_review_prompt', array( $this, 'ajax_dismiss_review_prompt' ) );
+		add_action( 'current_screen', array( $this, 'maybe_dismiss_automatic_capture_notice' ) );
 
 		// Admin Scripts.
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_scripts' ) );
@@ -134,6 +135,41 @@ class WC_Amazon_Payments_Advanced_Admin {
 		}
 
 		$notices = array();
+
+		$capture_failures = array();
+		if ( class_exists( 'WC_Gateway_Amazon_Payments_Advanced' ) && current_user_can( 'edit_shop_orders' ) ) {
+			$failed_orders = wc_get_orders(
+				array(
+					'limit'      => 20,
+					'meta_key'   => WC_Gateway_Amazon_Payments_Advanced::AUTOMATIC_CAPTURE_FAILED, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+					'meta_value' => 'yes', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+				)
+			);
+			foreach ( $failed_orders as $order ) {
+				$capture_failures[] = sprintf(
+					'<a href="%1$s" target="_blank" rel="noopener noreferrer">#%2$s</a>',
+					esc_url( $order->get_edit_order_url() ),
+					esc_html( $order->get_order_number() )
+				);
+			}
+		}
+		if ( $capture_failures ) {
+			$notices[] = array(
+				'dismiss_action' => 'amazon_pay_dismiss_automatic_capture_failures',
+				'class'          => 'notice notice-error',
+				'text'           => sprintf(
+					/* translators: 1) Comma-separated links to the affected orders. */
+					_n(
+						'<strong>Amazon Pay:</strong> the payment could not be captured automatically. Review order: %1$s',
+						'<strong>Amazon Pay:</strong> payments could not be captured automatically. Review orders: %1$s',
+						count( $capture_failures ),
+						'woocommerce-gateway-amazon-payments-advanced'
+					),
+					implode( ', ', $capture_failures )
+				),
+				'is_dismissable' => false,
+			);
+		}
 
 		$gateway = wc_apa()->get_gateway();
 
@@ -424,6 +460,22 @@ class WC_Amazon_Payments_Advanced_Admin {
 		update_option( 'amazon_payments_advanced_hidden_until_date', $hidden_until_date );
 
 		wp_die( '', 200 );
+	}
+
+	/**
+	 * Dismiss the automatic capture failure notice for the order being edited.
+	 */
+	public function maybe_dismiss_automatic_capture_notice() {
+		$screen = get_current_screen();
+		if ( ! $screen || WC_Amazon_Payments_Advanced_Utils::get_edit_order_screen_id() !== $screen->id || ! class_exists( 'WC_Gateway_Amazon_Payments_Advanced' ) || ! current_user_can( 'edit_shop_orders' ) ) {
+			return;
+		}
+
+		$order = wc_get_order( WC_Amazon_Payments_Advanced_Utils::get_edit_order_id() );
+		if ( $order && 'yes' === $order->get_meta( WC_Gateway_Amazon_Payments_Advanced::AUTOMATIC_CAPTURE_FAILED ) ) {
+			$order->update_meta_data( WC_Gateway_Amazon_Payments_Advanced::AUTOMATIC_CAPTURE_FAILED, 'seen' );
+			$order->save();
+		}
 	}
 
 	/**

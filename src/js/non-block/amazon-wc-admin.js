@@ -61,6 +61,14 @@
 				manual: true,
 			} );
 
+			var automatic_capture_row = $( '#woocommerce_amazon_payments_advanced_automatic_capture' ).closest( 'tr' );
+			var toggle_automatic_capture = function() {
+				automatic_capture_row.toggle( 'authorize' === wc_simple_path_form.payment_capture.val() && 'async' === wc_simple_path_form.authorization_mode.val() );
+			};
+			toggle_automatic_capture();
+			wc_simple_path_form.payment_capture.on( 'change', toggle_automatic_capture );
+			wc_simple_path_form.authorization_mode.on( 'change', toggle_automatic_capture );
+
 			// Init values if region is already selected
 			wc_simple_path_form.payment_region_on_change();
 
